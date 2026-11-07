@@ -28,6 +28,8 @@ Long sessions get more expensive with every turn. When a session reaches its ste
 
 ## Install
 
+> **Not published on npm.** The package named `dsh-session-rotate` on npm is unrelated to this project (different author, no repository link) — do not install it with `npm i dsh-session-rotate`. Use one of the routes below: a `github:` dependency, a local `link:`, or drop it into `node_modules` manually.
+
 **1. Register the dependency and the bundle in your profile's `package.json`** (if you already cloned the repo locally, `"link:<absolute plugin path>"` or `"file:<same>"` works instead of `github:`)
 
 ```json

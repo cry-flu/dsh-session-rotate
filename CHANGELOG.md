@@ -5,7 +5,10 @@
 
 ## [Unreleased]
 
-（暂无）
+### 文档
+
+- 新增 `CONTRIBUTING.md` 与 PR 模板：本地开发、测试、提交信息格式、不会被接受的改动
+- `README.md` / `README.en.md` 安装章节标注：npm 上的同名包 `dsh-session-rotate` 与本项目无关
 
 ## [1.0.0] — 2026-11-07
 

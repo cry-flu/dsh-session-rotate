@@ -28,6 +28,8 @@
 
 ## 安装
 
+> **没有发布到 npm。** npm 上的同名包 `dsh-session-rotate` 与本项目无关（作者、仓库都对不上），不要用 `npm i dsh-session-rotate` 装。请按下面任一方式安装：`github:` 依赖、本地 `link:`，或手动放进 `node_modules`。
+
 **1. profile 的 `package.json`：登记依赖和 bundle**（已 clone 到本地可用 `"link:<插件目录绝对路径>"` 或 `"file:<同上>"` 代替 `github:`）
 
 ```json
