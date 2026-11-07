@@ -27,3 +27,6 @@ tmp-*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# npm pack 产物
+*.tgz
