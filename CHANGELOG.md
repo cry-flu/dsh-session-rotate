@@ -3,6 +3,26 @@
 本项目的所有重要改动都记在这里。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [1.4.0] — 2026-11-08
+
+关掉「换新后自动跳到新会话」也能用延迟归档了：到点先把界面切到新会话，再归档旧会话；这个「到点先跳」本身也可以关掉。
+
+### 新增
+
+- `switchOnArchive`（默认 `true`）：只在 `autoSwitch=false` 且 `deferArchiveMinutes>0` 时生效。到点归档前先把界面切到新会话，`SWITCH_LEAD_MS`（3 秒）之后再真正归档，避免你正看着的会话变成「暂时无法查看」。设 `false` 则界面不跳、旧会话永不归档。设置页对应勾选「归档到点时自动跳到新会话」，只在「换新后自动跳到新会话」取消勾选时才出现。
+
+### 变更
+
+- `archivePlan`：`autoSwitch=false` 不再一律返回 `none`。现在留了回看窗口（`deferArchiveMinutes>0`）且允许到点跳（`switchOnArchive` 未关）才走 `deferred`；分钟数为 `0` 仍是不归档（没有「到点」可切）。
+- 交接摘要里「旧会话现在在哪」的措辞同步改（`archiveNote`），不再一律写「仍在会话列表里」。
+- `/dsh-session-rotate/state` 的 `pending` 新增 `switch` 与 `reason` 字段：跳不跳由服务端逐次算好，客户端不再自己读开关；`reason='archive'` 那一跳只在「当前正看着被归档的会话」时才动界面。
+- `state.json` 的 `deferredArchives` 条目多存 `workspaceId`（旧条目缺它就只归档、不跳）。
+- 配置警告（`configWarnings`）与保存日志文案同步：只有 `autoSwitch` 和 `switchOnArchive` 都关才提示「归档设置不生效」。
+
+## [1.3.1] — 2026-11-08
+
+- `state.json` 的 `ownSessions` 加 200 条上限（`trimOwnSessions`），待归档的会话永远钉住不删；重录了脱敏的截图与演示 GIF。
+
 ## [1.3.0] — 2026-11-08
 
 新增「换新后自动跳到新会话」开关，并把延迟归档的默认值改回 1.0.0 的行为；归档动作现在只认本插件换出来的会话。

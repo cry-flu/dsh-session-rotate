@@ -68,13 +68,44 @@ test('archivePlan：三态按开关取值', () => {
 
 // ---------- 三开关组合 ----------
 
-test('组合：不跳转 + 延迟归档（不跳转优先，一律不归档）', () => {
+test('组合：不跳转 + 延迟归档 + 到点自动跳（默认开）→ deferred', () => {
   const cfg = normalizeConfig({ autoSwitch: false, archiveOnRotate: true, deferArchiveMinutes: 5 })
   assert.equal(cfg.autoSwitch, false)
+  assert.equal(cfg.switchOnArchive, true)
   assert.equal(cfg.archiveOnRotate, true)
   assert.equal(cfg.deferArchiveMinutes, 5)
-  // 界面停在旧会话上，归档它就成了「暂时无法查看」→ 计划必须是 none
+  // 到点会先把界面切到新会话再归档，所以可以延迟归档
+  assert.equal(archivePlan(cfg, new Set(['s-mine']), 's-mine'), 'deferred')
+})
+
+test('组合：不跳转 + 延迟归档 + 关掉「到点自动跳」→ none（没人切界面，不能归档）', () => {
+  const cfg = normalizeConfig({
+    autoSwitch: false,
+    switchOnArchive: false,
+    archiveOnRotate: true,
+    deferArchiveMinutes: 5,
+  })
+  assert.equal(cfg.switchOnArchive, false)
   assert.equal(archivePlan(cfg, new Set(['s-mine']), 's-mine'), 'none')
+})
+
+test('组合：不跳转 + 到点自动跳开着，但没留回看分钟 → none（没有「到点」可切）', () => {
+  const cfg = normalizeConfig({
+    autoSwitch: false,
+    switchOnArchive: true,
+    archiveOnRotate: true,
+    deferArchiveMinutes: 0,
+  })
+  assert.equal(archivePlan(cfg, new Set(['s-mine']), 's-mine'), 'none')
+})
+
+test('switchOnArchive 缺省为 true，且面板 payload 不带它时继承旧值', () => {
+  assert.equal(normalizeConfig({}).switchOnArchive, true)
+  const prev = { defaultMaxSteps: 40, workspaces: [], switchOnArchive: false }
+  const next = sanitizeConfig({ defaultMaxSteps: 40, workspaces: [], confirmEmpty: true }, prev)
+  assert.equal(next.switchOnArchive, false)
+  const back = sanitizeConfig({ defaultMaxSteps: 40, workspaces: [], confirmEmpty: true, switchOnArchive: true }, prev)
+  assert.equal(back.switchOnArchive, true)
 })
 
 test('组合：不跳转 + 立即归档（同样不归档）', () => {
