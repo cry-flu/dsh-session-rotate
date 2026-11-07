@@ -55,6 +55,17 @@ test('summaryText：延迟归档时写清「先留 N 分钟」；0 分钟才算�
   assert.ok(immediate.includes('上一会话已归档'))
 })
 
+test('summaryText：不跳转时不说「已归档」（旧会话其实还在）', () => {
+  const session = { id: 'sess-old', ownEvents: () => [assistant('好')] }
+  const text = summaryText(session, { title: 'demo' }, 41, 40, null, {
+    archiveOnRotate: true,
+    deferArchiveMinutes: 0,
+    autoSwitch: false,
+  })
+  assert.ok(text.includes('上一会话未归档'))
+  assert.ok(!text.includes('上一会话已归档'))
+})
+
 test('summaryText：没有助手回复时有占位，不崩', () => {
   const session = { id: 's', ownEvents: () => [user('就一句话')] }
   const text = summaryText(session, { title: 'demo' }, 10, 40, null, { archiveOnRotate: true, deferArchiveMinutes: 0 })

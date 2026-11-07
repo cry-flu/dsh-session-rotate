@@ -24,7 +24,7 @@ Long sessions get more expensive with every turn. When a session reaches its ste
 | Turn-boundary prediction | Estimates the next turn from the mean of the last 3 turn deltas and rotates at the boundary instead of waiting to blow past the limit |
 | Protection gates | `minSteps` hard floor, `cooldownMinutes` cooldown, `maxRotations` consecutive rotations before a workspace is paused |
 | Dry run | `dryRun` only writes a log line: no session is created, nothing is archived, the UI does not jump |
-| Three independent switches | Auto-archive (`archiveOnRotate`), deferred archive (`deferArchiveMinutes`) and auto-switch (`autoSwitch`) do not interfere and can be combined freely |
+| Three switches | Auto-archive (`archiveOnRotate`), deferred archive (`deferArchiveMinutes`) and auto-switch (`autoSwitch`). The first two combine freely; with auto-switch off neither applies and the old session is always kept |
 | Only its own sessions | Archives only the old sessions this plugin rotated out, recorded in `state.json` under `ownSessions`; no enumeration, no bulk operations, other sessions are never touched |
 | Control panel | Settings → 会话换新 to edit the default limit, the gates, the dry-run switch and the three toggles; saving takes effect immediately |
 
@@ -78,9 +78,9 @@ Config lives in `~/.dsh/session-rotate/config.json`; the settings page edits the
 | `dryRun` | `false` | Dry-run switch |
 | `archiveOnRotate` | `true` | Archive the old session on rotation; `false` keeps it in the sidebar — clean it up yourself when you no longer need it (the last reply is still pasted in full into the handoff) |
 | `deferArchiveMinutes` | `0` | How long the old session stays unarchived after a rotation, so you can open it from the sidebar and read its last reply (the default view hides archived sessions); `0` archives immediately, matching 1.0.0; using the old session inside that window extends it |
-| `autoSwitch` | `true` | Whether the UI switches to the new session after a rotation; `false` still creates the session and delivers the handoff, but the UI stays on the old one and the new session only shows up in the sidebar |
+| `autoSwitch` | `true` | Whether the UI switches to the new session after a rotation; `false` still creates the session and delivers the handoff, but the UI stays on the old one and the new session only shows up in the sidebar. While `false`, the two archive settings above do not apply — you are still looking at the old session |
 
-The three switches are independent: `archiveOnRotate` (on/off), `deferArchiveMinutes` (minutes, `0` = immediate) and `autoSwitch` (on/off) combine freely. Turning auto-archive off only affects old sessions this plugin rotated out; nothing else is touched.
+`archiveOnRotate` (on/off) and `deferArchiveMinutes` (minutes, `0` = immediate) combine freely; when `autoSwitch` is off neither applies and the old session is always kept. Turning auto-archive off only affects old sessions this plugin rotated out; nothing else is touched.
 
 An empty `maxSteps` follows the default and keeps following it; a positive integer pins that workspace to its own number. The workspace name must match the sidebar name **exactly** — a mismatch is skipped silently, so check `debug.log` to see what actually matched.
 

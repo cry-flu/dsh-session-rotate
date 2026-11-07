@@ -24,7 +24,7 @@
 | 轮次预判 | 用最近 3 轮增量的均值估下一轮，在轮边界提前换，而不是等越限才换 |
 | 保护闸 | `minSteps` 硬下限、`cooldownMinutes` 冷却、`maxRotations` 连续触发后暂停该工作区 |
 | 试运行 | `dryRun` 只写日志，不建会话、不归档、不跳转 |
-| 三个独立开关 | 自动归档（`archiveOnRotate`）、延迟归档（`deferArchiveMinutes`）、自动跳转（`autoSwitch`）互不影响，可任意组合 |
+| 三个开关 | 自动归档（`archiveOnRotate`）、延迟归档（`deferArchiveMinutes`）、自动跳转（`autoSwitch`）。前两项可任意组合；关掉自动跳转时这两项一律不生效，旧会话一定保留 |
 | 只动自己的会话 | 只归档本插件换出来的旧会话，ID 记在 `state.json` 的 `ownSessions`；不遍历、不批量、不碰其他会话 |
 | 控制界面 | 设置页「会话换新」里改默认上限、保护闸、试运行与三个开关，保存即生效 |
 
@@ -78,9 +78,9 @@ cmd /c mklink /J "<profile>\node_modules\dsh-session-rotate" "<插件目录绝�
 | `dryRun` | `false` | 试运行开关 |
 | `archiveOnRotate` | `true` | 换新时归档旧会话；设 `false` 则旧会话会留在侧边栏，请自行定期清理（上一轮正文仍会整段贴进交接摘要） |
 | `deferArchiveMinutes` | `0` | 换新后旧会话先留多少分钟再归档，留的这段时间它在侧边栏里可直接点开看最后一条回复（默认视图不显示已归档会话）；`0` = 换新即归档（与 1.0.0 行为一致）；保留期内旧会话又被用到会自动顺延 |
-| `autoSwitch` | `true` | 换新后是否把界面切到新会话；设 `false` 则仍然建新会话、投递交接摘要，但界面停在旧会话，新会话只出现在侧边栏 |
+| `autoSwitch` | `true` | 换新后是否把界面切到新会话；设 `false` 则仍然建新会话、投递交接摘要，但界面停在旧会话，新会话只出现在侧边栏。此时上面两项归档设置不生效（人还停在旧会话上，归档它就看不成了） |
 
-三个开关互相独立：`archiveOnRotate`（开/关）、`deferArchiveMinutes`（分钟，`0` = 立即）、`autoSwitch`（开/关）可以任意组合。关掉自动归档只影响本插件换出来的旧会话，其他会话一律不碰。
+`archiveOnRotate`（开/关）与 `deferArchiveMinutes`（分钟，`0` = 立即）可以任意组合；`autoSwitch` 关掉时这两项一律不生效，旧会话一定保留。关掉自动归档只影响本插件换出来的旧会话，其他会话一律不碰。
 
 `maxSteps` 留空 = 跟随默认，之后改默认值它跟着变；填正整数就固定成那个数。工作区名必须与侧边栏显示名**完全一致**，对不上会静默跳过，实际匹配情况看 `debug.log`。
 

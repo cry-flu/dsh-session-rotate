@@ -68,18 +68,21 @@ test('archivePlan：三态按开关取值', () => {
 
 // ---------- 三开关组合 ----------
 
-test('组合：不跳转 + 延迟归档（两个开关互不影响）', () => {
+test('组合：不跳转 + 延迟归档（不跳转优先，一律不归档）', () => {
   const cfg = normalizeConfig({ autoSwitch: false, archiveOnRotate: true, deferArchiveMinutes: 5 })
   assert.equal(cfg.autoSwitch, false)
   assert.equal(cfg.archiveOnRotate, true)
   assert.equal(cfg.deferArchiveMinutes, 5)
-  // 不跳转不影响归档计划：仍走延迟归档
-  assert.equal(archivePlan(cfg, new Set(['s-mine']), 's-mine'), 'deferred')
+  // 界面停在旧会话上，归档它就成了「暂时无法查看」→ 计划必须是 none
+  assert.equal(archivePlan(cfg, new Set(['s-mine']), 's-mine'), 'none')
 })
 
-test('组合：不跳转 + 立即归档', () => {
+test('组合：不跳转 + 立即归档（同样不归档）', () => {
   const cfg = normalizeConfig({ autoSwitch: false, archiveOnRotate: true, deferArchiveMinutes: 0 })
-  assert.equal(archivePlan(cfg, new Set(['s-mine']), 's-mine'), 'now')
+  assert.equal(archivePlan(cfg, new Set(['s-mine']), 's-mine'), 'none')
+  // 跳转开着时这条路径照常立刻归档，别把正常行为改坏
+  const jump = normalizeConfig({ autoSwitch: true, archiveOnRotate: true, deferArchiveMinutes: 0 })
+  assert.equal(archivePlan(jump, new Set(['s-mine']), 's-mine'), 'now')
 })
 
 // ---------- 回归：关闭自动归档时不动任何已有归档会话 ----------
