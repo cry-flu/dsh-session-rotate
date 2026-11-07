@@ -66,6 +66,22 @@
 **不在 npm 上。** 包名 `dsh-session-rotate` 在 npm 上属于另一位作者的同名插件，不是本项目。
 
 大部分代码由 AI 辅助生成，经人工审查与本地测试，但不保证所有环境行为如预期。有问题请开 issue，最想要的是「你的环境里到底能不能正常触发」。
+
+---
+
+## v1.0.0 相对 0.2.1 的变更
+
+### 版本变更清单
+
+- 版本号 `0.2.1` → `1.0.0`；`engines.node` 声明 `>=20`。
+- `npm test` 改为 `node --test`：自动发现测试文件，不依赖 shell 展开 glob，Node 20 / 22 / 24 都能跑。
+- `package.json` 补齐 `repository` / `bugs` / `homepage` / `author`。
+- README：删除全部本机绝对路径，安装步骤改为 `github:OWNER/REPO`；补充「改完代码怎么让它真正加载」。
+- 新增 `.github/workflows/test.yml`：Ubuntu / Windows × Node 20 / 22 / 24 跑单测。
+
+### 已知限制
+
+上限是软上限，真实换新点会在 `maxSteps` 附近浮动。
 ```
 
 ---
