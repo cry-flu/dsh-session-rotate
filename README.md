@@ -4,6 +4,7 @@
 [![release](https://img.shields.io/github/v/release/cry-flu/dsh-session-rotate?label=release&color=blue)](https://github.com/cry-flu/dsh-session-rotate/releases)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
+[![文档](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://cry-flu.github.io/dsh-session-rotate/)
 
 长会话越滚越贵。步数到上限时，本插件在**这一轮答完之后**（绝不中途打断）自动开一个新会话、把一份本地拼出来的交接摘要投过去、归档旧会话，然后把界面切到新会话。摘要不调用模型，是纯本地拼装，省下的是「手动总结 + 复制 + 新建会话 + 记住进度」这四步。
 
