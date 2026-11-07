@@ -96,6 +96,15 @@ test('archiveOnRotate 默认开；显式 false 才不归档旧会话', () => {
   assert.equal(flipped.archiveOnRotate, false)
 })
 
+test('deferArchiveMinutes：默认 0（立即归档，与 1.0.0 一致），面板不给就沿用旧值', () => {
+  assert.equal(normalizeConfig({}).deferArchiveMinutes, 0)
+  assert.equal(normalizeConfig({ deferArchiveMinutes: 0 }).deferArchiveMinutes, 0)
+  assert.equal(normalizeConfig({ deferArchiveMinutes: '12' }).deferArchiveMinutes, 12)
+  assert.equal(normalizeConfig({ deferArchiveMinutes: -3 }).deferArchiveMinutes, 0)
+  assert.equal(sanitizeConfig(panelPayload(), { deferArchiveMinutes: 20 }).deferArchiveMinutes, 20)
+  assert.equal(sanitizeConfig({ ...panelPayload(), deferArchiveMinutes: 0 }, { deferArchiveMinutes: 20 }).deferArchiveMinutes, 0)
+})
+
 test('clipReply：没超长就整段照贴，超长才头尾各留一段', () => {
   const short = '一'.repeat(4000)
   assert.equal(clipReply(short), short)

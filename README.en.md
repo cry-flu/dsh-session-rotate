@@ -8,7 +8,7 @@ English | [简体中文](README.md)
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](package.json)
 [![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://cry-flu.github.io/dsh-session-rotate/)
 
-Long sessions get more expensive with every turn. When a session reaches its step limit, this plugin waits until **the current turn has finished** (it never cuts a turn in half), opens a new session, hands over a handoff summary assembled locally, archives the old session, and switches the UI to the new one. The summary never touches a model — it is plain local templating — so what you save is the whole manual loop: summarize, copy, create a session, remember where you were.
+Long sessions get more expensive with every turn. When a session reaches its step limit, this plugin waits until **the current turn has finished** (it never cuts a turn in half), opens a new session, hands over a handoff summary assembled locally, archives the old session, and switches the UI to the new one. The old session is archived right away by default; set `deferArchiveMinutes` to keep it in the sidebar for a few minutes so you can read its last reply first. The summary never touches a model — it is plain local templating — so what you save is the whole manual loop: summarize, copy, create a session, remember where you were.
 
 - Runs as a profile plugin inside DeepSeek Harness (DSH) Desktop / Web GUI.
 - **Not on npm.** The npm name `dsh-session-rotate` belongs to a different plugin by another author — that is not this project.
@@ -24,7 +24,9 @@ Long sessions get more expensive with every turn. When a session reaches its ste
 | Turn-boundary prediction | Estimates the next turn from the mean of the last 3 turn deltas and rotates at the boundary instead of waiting to blow past the limit |
 | Protection gates | `minSteps` hard floor, `cooldownMinutes` cooldown, `maxRotations` consecutive rotations before a workspace is paused |
 | Dry run | `dryRun` only writes a log line: no session is created, nothing is archived, the UI does not jump |
-| Control panel | Settings → 会话换新 to edit the default limit, the gates and the dry-run switch; saving takes effect immediately |
+| Three independent switches | Auto-archive (`archiveOnRotate`), deferred archive (`deferArchiveMinutes`) and auto-switch (`autoSwitch`) do not interfere and can be combined freely |
+| Only its own sessions | Archives only the old sessions this plugin rotated out, recorded in `state.json` under `ownSessions`; no enumeration, no bulk operations, other sessions are never touched |
+| Control panel | Settings → 会话换新 to edit the default limit, the gates, the dry-run switch and the three toggles; saving takes effect immediately |
 
 ## Install
 
@@ -74,7 +76,11 @@ Config lives in `~/.dsh/session-rotate/config.json`; the settings page edits the
 | `cooldownMinutes` | `10` | At most one rotation per workspace inside this window |
 | `maxRotations` | `3` | Rotating that many times inside `cooldown × maxRotations` pauses the workspace (state lives in `state.json` and survives restarts) |
 | `dryRun` | `false` | Dry-run switch |
-| `archiveOnRotate` | `true` | Archive the old session on rotation; `false` keeps it in the list (the last reply is still pasted in full into the handoff) |
+| `archiveOnRotate` | `true` | Archive the old session on rotation; `false` keeps it in the sidebar — clean it up yourself when you no longer need it (the last reply is still pasted in full into the handoff) |
+| `deferArchiveMinutes` | `0` | How long the old session stays unarchived after a rotation, so you can open it from the sidebar and read its last reply (the default view hides archived sessions); `0` archives immediately, matching 1.0.0; using the old session inside that window extends it |
+| `autoSwitch` | `true` | Whether the UI switches to the new session after a rotation; `false` still creates the session and delivers the handoff, but the UI stays on the old one and the new session only shows up in the sidebar |
+
+The three switches are independent: `archiveOnRotate` (on/off), `deferArchiveMinutes` (minutes, `0` = immediate) and `autoSwitch` (on/off) combine freely. Turning auto-archive off only affects old sessions this plugin rotated out; nothing else is touched.
 
 An empty `maxSteps` follows the default and keeps following it; a positive integer pins that workspace to its own number. The workspace name must match the sidebar name **exactly** — a mismatch is skipped silently, so check `debug.log` to see what actually matched.
 

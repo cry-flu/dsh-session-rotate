@@ -35,7 +35,10 @@ test('userTexts：空输入不炸', () => {
 test('summaryText：上一轮正文整段照贴，换新后不必回旧会话翻', () => {
   const body = '第一段：结论先放这里。\n\n第二段：细节和命令都在这里，' + '细'.repeat(300)
   const session = { id: 'sess-old', ownEvents: () => [user('帮我看下 build 为什么挂'), assistant(body), user('再补一版')] }
-  const text = summaryText(session, { title: 'demo' }, 41, 40, '越限（软上限）', false)
+  const text = summaryText(session, { title: 'demo' }, 41, 40, '越限（软上限）', {
+    archiveOnRotate: false,
+    deferArchiveMinutes: 5,
+  })
   assert.ok(text.startsWith('【会话交接 · 自动】'))
   assert.ok(text.includes('上一会话未归档，仍在会话列表里'))
   assert.ok(text.includes('第一段：结论先放这里。'))
@@ -44,9 +47,17 @@ test('summaryText：上一轮正文整段照贴，换新后不必回旧会话翻
   assert.ok(text.trimEnd().endsWith('>>>'))
 })
 
+test('summaryText：延迟归档时写清「先留 N 分钟」；0 分钟才算已归档', () => {
+  const session = { id: 'sess-old', ownEvents: () => [assistant('好')] }
+  const deferred = summaryText(session, { title: 'demo' }, 41, 40, null, { archiveOnRotate: true, deferArchiveMinutes: 5 })
+  assert.ok(deferred.includes('上一会话先留在列表里 5 分钟'))
+  const immediate = summaryText(session, { title: 'demo' }, 41, 40, null, { archiveOnRotate: true, deferArchiveMinutes: 0 })
+  assert.ok(immediate.includes('上一会话已归档'))
+})
+
 test('summaryText：没有助手回复时有占位，不崩', () => {
   const session = { id: 's', ownEvents: () => [user('就一句话')] }
-  const text = summaryText(session, { title: 'demo' }, 10, 40, null, true)
+  const text = summaryText(session, { title: 'demo' }, 10, 40, null, { archiveOnRotate: true, deferArchiveMinutes: 0 })
   assert.ok(text.includes('上一会话已归档'))
   assert.ok(text.includes('（上一轮没有文本回复）'))
 })
