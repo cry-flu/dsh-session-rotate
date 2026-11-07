@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { userTexts } from '../lib/index.js'
+import { userTexts, summaryText } from '../lib/index.js'
 
 const user = (text, kind = 'user') => ({
   type: 'user/message',
@@ -31,3 +31,23 @@ test('userTexts：空输入不炸', () => {
   assert.deepEqual(userTexts(undefined), [])
   assert.deepEqual(userTexts([]), [])
 })
+
+test('summaryText：上一轮正文整段照贴，换新后不必回旧会话翻', () => {
+  const body = '第一段：结论先放这里。\n\n第二段：细节和命令都在这里，' + '细'.repeat(300)
+  const session = { id: 'sess-old', ownEvents: () => [user('帮我看下 build 为什么挂'), assistant(body), user('再补一版')] }
+  const text = summaryText(session, { title: 'demo' }, 41, 40, '越限（软上限）', false)
+  assert.ok(text.startsWith('【会话交接 · 自动】'))
+  assert.ok(text.includes('上一会话未归档，仍在会话列表里'))
+  assert.ok(text.includes('第一段：结论先放这里。'))
+  assert.ok(text.includes('第二段：细节和命令都在这里'))
+  assert.ok(text.includes('再补一版'))
+  assert.ok(text.trimEnd().endsWith('>>>'))
+})
+
+test('summaryText：没有助手回复时有占位，不崩', () => {
+  const session = { id: 's', ownEvents: () => [user('就一句话')] }
+  const text = summaryText(session, { title: 'demo' }, 10, 40, null, true)
+  assert.ok(text.includes('上一会话已归档'))
+  assert.ok(text.includes('（上一轮没有文本回复）'))
+})
+

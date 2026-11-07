@@ -3,12 +3,21 @@
 本项目的所有重要改动都记在这里。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased]
+## [1.1.0] — 2026-11-08
+
+换新后不必回旧会话翻最后一条回复。
+
+### 变更
+
+- 交接摘要末尾改为附上「上一会话最后的回复」**全文**（≤4000 字，超出头尾各留一段）：以前只取最后 200 字压成一行，常常是半句开头，读不懂。
+- 新增 `archiveOnRotate`（默认 `true`）：设 `false` 后换新不再归档旧会话，旧会话留在列表里方便回看。设置页对应勾选「换新时归档旧会话」。
+- 交接摘要的「步数」行写明旧会话是否已归档，不再一律写「已归档」。
 
 ### 文档
 
 - 新增 `CONTRIBUTING.md` 与 PR 模板：本地开发、测试、提交信息格式、不会被接受的改动
 - `README.md` / `README.en.md` 安装章节标注：npm 上的同名包 `dsh-session-rotate` 与本项目无关
+- README（中英）与 Pages 站点补 `archiveOnRotate` 与新的交接摘要格式
 
 ## [1.0.0] — 2026-11-07
 

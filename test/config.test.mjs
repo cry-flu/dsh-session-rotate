@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeConfig, sanitizeConfig, configWarnings, workspaceOverrides } from '../lib/index.js'
+import { normalizeConfig, sanitizeConfig, configWarnings, workspaceOverrides, clipReply } from '../lib/index.js'
 
 /** 桌面面板实际提交的 payload：只有 defaultMaxSteps / confirmEmpty / workspaces */
 const panelPayload = (workspaces = [{ name: 'my-workspace', maxSteps: null }]) => ({
@@ -85,4 +85,23 @@ test('configWarnings：上限低于最低步数时给提示（默认与按工作
   assert.match(wsLow[0], /工作区「b」/)
 
   assert.deepEqual(configWarnings(normalizeConfig({ defaultMaxSteps: 40, minSteps: 10, workspaces: [{ name: 'c', maxSteps: 20 }] })), [])
+})
+
+test('archiveOnRotate 默认开；显式 false 才不归档旧会话', () => {
+  assert.equal(normalizeConfig({}).archiveOnRotate, true)
+  assert.equal(normalizeConfig({ archiveOnRotate: false }).archiveOnRotate, false)
+  const kept = sanitizeConfig(panelPayload(), { archiveOnRotate: false })
+  assert.equal(kept.archiveOnRotate, false)
+  const flipped = sanitizeConfig({ ...panelPayload(), archiveOnRotate: false }, { archiveOnRotate: true })
+  assert.equal(flipped.archiveOnRotate, false)
+})
+
+test('clipReply：没超长就整段照贴，超长才头尾各留一段', () => {
+  const short = '一'.repeat(4000)
+  assert.equal(clipReply(short), short)
+  const long = clipReply('头'.repeat(6000) + '尾'.repeat(1000))
+  assert.ok(long.startsWith('头'))
+  assert.ok(long.endsWith('尾'))
+  assert.ok(long.includes('中间省略'))
+  assert.ok(long.length < 4200)
 })

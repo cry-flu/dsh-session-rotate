@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-rotate",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "DSH 插件：会话步数到上限时，在轮末自动开新会话、投递本地拼装的交接摘要并归档旧会话（按工作区配置上限，零模型调用）。",
   "keywords": [
     "dsh",

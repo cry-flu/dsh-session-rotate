@@ -20,7 +20,7 @@ Long sessions get more expensive with every turn. When a session reaches its ste
 | Capability | What it does |
 | --- | --- |
 | Per-workspace limits | One `maxSteps` per workspace; leave it empty to inherit the global default — and keep inheriting when the default changes |
-| Templated handoff summary | Fixed template, at most 16 lines, built from your latest user message plus the last assistant reply. **No extra model call.** |
+| Templated handoff summary | Fixed template: a head of at most 16 lines (latest user message plus earlier instructions), then **the full text of the last assistant reply** (up to 4000 chars, head and tail kept beyond that). **No extra model call.** |
 | Turn-boundary prediction | Estimates the next turn from the mean of the last 3 turn deltas and rotates at the boundary instead of waiting to blow past the limit |
 | Protection gates | `minSteps` hard floor, `cooldownMinutes` cooldown, `maxRotations` consecutive rotations before a workspace is paused |
 | Dry run | `dryRun` only writes a log line: no session is created, nothing is archived, the UI does not jump |
@@ -74,6 +74,7 @@ Config lives in `~/.dsh/session-rotate/config.json`; the settings page edits the
 | `cooldownMinutes` | `10` | At most one rotation per workspace inside this window |
 | `maxRotations` | `3` | Rotating that many times inside `cooldown × maxRotations` pauses the workspace (state lives in `state.json` and survives restarts) |
 | `dryRun` | `false` | Dry-run switch |
+| `archiveOnRotate` | `true` | Archive the old session on rotation; `false` keeps it in the list (the last reply is still pasted in full into the handoff) |
 
 An empty `maxSteps` follows the default and keeps following it; a positive integer pins that workspace to its own number. The workspace name must match the sidebar name **exactly** — a mismatch is skipped silently, so check `debug.log` to see what actually matched.
 
