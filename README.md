@@ -13,6 +13,8 @@
 - 运行环境：DeepSeek Harness（DSH）桌面版 / Web GUI，作为 profile 插件挂载
 - 不在 npm 上（`dsh-session-rotate` 这个包名已被另一位作者的同名插件占用，**不是本项目**）
 
+![设置 → 会话换新：勾选工作区、填步数上限，保存即生效](docs/img/demo.gif)
+
 ## 功能
 
 | 能力 | 说明 |

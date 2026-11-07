@@ -101,30 +101,60 @@
 | 21–27 | 再跨一次：轮末自动换新会话，界面切过去、旧会话进归档 | 核心卖点 |
 | 27–30 | 新会话第一条消息就是交接摘要（滚动露两行） | 证明"进度没丢" |
 
-录制要点：**1280×720 以上、只录窗口区域**、不要录到自己的 key/路径/其他会话标题、别用鼠标画圈（GIF 里会糊）。
+录制要点：**1280×720 以上、只录窗口区域**、不要录到自己的 key/路径/其他会话标题、别用鼠标画圈（GIF 里会糊）。走路线 A 时这些都由脚本兜住（1200×900 定死、假工作区、假光标带点击涟漪）。
 
-### 路线 A：ScreenToGif（GUI，最省事，不用装 ffmpeg）
+素材里一定会出现的 7 类敏感区（发图前对着核一遍）：标题栏用户名、左侧会话标题列表、对话正文/思考块/模型名、底部状态栏的 token 数与缓存命中、设置页的工作区名单、「最近日志」里的 `C:\Users\<你>\.dsh\...` 与 session UUID、「打开配置文件」旁的路径。
+
+### 路线 A：仓库自带录制脚本（推荐，全自动、不上屏）
+
+`tools\record-cdp.ps1` 起一个**独立的临时 DSH_HOME + 无头 Chrome**，用 CDP 截页面，不碰你的屏幕：屏幕上开着什么窗口都录不进去，演示用的工作区是脚本自己造的假名字（`demo-app` / `landing-page` / `sdk-samples`），画面里出现的路径也是 `C:\ProgramData\...`，没有用户名、没有你的仓库路径。
+
+```powershell
+cd 'D:\dsh-plugins\dsh-session-rotate'
+pwsh -NoProfile -File .\tools\record-cdp.ps1
+# 产出 docs\img\demo.gif（约 0.5 MB / 13 秒 / 170 帧左右）
+```
+
+- 需要：Node 22+（用内置 WebSocket，不用 `npm install`）、ffmpeg、Chrome 或 Edge、`dsh` 在 PATH 上。
+- 第一次跑会往那个临时 HOME 装一次插件（走网络）；装不了或已装好可以加 `-SkipPluginInstall`，另用 `-PluginRef <npm 或 github 地址>` 换来源。
+- 常用参数：`-Out docs\img\demo.gif -Port 3399 -CdpPort 9222 -Fps 14`；想留中间帧/调色板加 `-Keep`；Chrome、ffmpeg 位置特殊时用 `-Chrome` / `-Ffmpeg`。
+- 想复用自己的干净 HOME：`-DshHome D:\tmp\demo-home`。**不要指向日常的 `~/.dsh`**，否则真实工作区名和配置路径会被录进画面。
+- 插件没装上、或装上了没挂载（页面上根本没有「会话换新」这一栏）时，脚本会直接报错退出并打印日志尾部，不会录出一张废片。
+
+### 路线 B：录真实界面（GDI 抓屏，谨慎）
+
+`tools\record-demo.ps1` 抓窗口客户区 → ffmpeg 两遍调色板压成 GIF（自动压到 ≤3 MB）。
+
+```powershell
+cd 'D:\dsh-plugins\dsh-session-rotate'
+pwsh -NoProfile -File .\tools\record-demo.ps1 -WindowTitle 'DeepSeek Harness' -Seconds 30 -StartDelay 8
+```
+
+**它录的是你屏幕上的像素**：任何盖在目标窗口上的窗口都会被一起录进去——包括左边栏的会话标题、设置页里的工作区真名、日志面板里的 `C:\Users\<你>\...` 和 session UUID。往 public 仓库发图请用路线 A；非要用这条，先关掉所有会重叠的窗口，录完**逐帧看一遍**再压。
+
+- 用 `-WindowTitle` 锁窗口（不传就录跑脚本那一刻的前台窗口）；录的是**窗口客户区**，不带任务栏。
+- ffmpeg 自动在 PATH 和 `D:\tools\ffmpeg\bin` 等处找；找不到用 `-Ffmpeg <路径>`。
+- 超 3 MB 会自动降到 10/8/6 fps 或 900/800/700 px 重压；仍超就 `-Seconds` 调短。
+- 想留原始帧复查：加 `-KeepFrames`（会打印帧目录，默认录完删掉）。
+
+### 路线 C：ScreenToGif（GUI，想手改帧时用）
 
 1. 装 [ScreenToGif](https://www.screentogif.com/)（开源，绿色版可用）。
 2. Recorder → 框选窗口 → 15 fps 录制。
 3. 录完在编辑器里删掉多余帧（这一步是压体积的关键），另存为 GIF。
 4. 目标：**≤ 3 MB**。超了就删帧、或把宽度降到 1000px。
 
-### 路线 B：ffmpeg（先录 mp4，再压成 GIF）
+### 路线 D：先录 mp4 再压（OBS / Win+G）
 
-本机目前**没有 ffmpeg**（`where.exe ffmpeg` → 找不到）。要装的话：
+ffmpeg 本机已有：`D:\tools\ffmpeg\bin\ffmpeg.exe`（9.0.2，只是不在 PATH 里）。
 
-```powershell
-winget install --id Gyan.FFmpeg -e
-# 装完重开一个终端，ffmpeg -version 能出版本号再继续
-```
-
-录 mp4（任选其一：`Win+G` Xbox Game Bar，或 OBS 只录窗口），存成 `demo.mp4`，然后两遍调色板压制（第二遍才出高质量小体积 GIF）：
+录 mp4（`Win+G` Xbox Game Bar，或 OBS 只录窗口），存成 `demo.mp4`，然后两遍调色板压制（第二遍才出高质量小体积 GIF）：
 
 ```powershell
 cd 'D:\dsh-plugins\dsh-session-rotate'
-ffmpeg -y -i demo.mp4 -vf "fps=12,scale=1000:-1:flags=lanczos,palettegen=stats_mode=diff" palette.png
-ffmpeg -y -i demo.mp4 -i palette.png -lavfi "fps=12,scale=1000:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" -loop 0 docs\img\demo.gif
+$ff = 'D:\tools\ffmpeg\bin\ffmpeg.exe'
+& $ff -y -i demo.mp4 -vf "fps=12,scale=1000:-1:flags=lanczos,palettegen=stats_mode=diff" palette.png
+& $ff -y -i demo.mp4 -i palette.png -lavfi "fps=12,scale=1000:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" -loop 0 docs\img\demo.gif
 (Get-Item docs\img\demo.gif).Length / 1MB
 ```
 

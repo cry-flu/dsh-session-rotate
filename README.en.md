@@ -13,6 +13,8 @@ Long sessions get more expensive with every turn. When a session reaches its ste
 - Runs as a profile plugin inside DeepSeek Harness (DSH) Desktop / Web GUI.
 - **Not on npm.** The npm name `dsh-session-rotate` belongs to a different plugin by another author — that is not this project.
 
+![Settings → Session rotate: tick workspaces, set a step limit, applied on save](docs/img/demo.gif)
+
 ## Features
 
 | Capability | What it does |
