@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeConfig, sanitizeConfig, canTouchOwn, archivePlan } from '../lib/index.js'
+import { normalizeConfig, sanitizeConfig, canTouchOwn, archivePlan, trimOwnSessions, OWN_CAP } from '../lib/index.js'
 
 /** 面板提交的最小 payload（与 lib/client.js 的 save() 同形，但只有必填项） */
 const payload = (extra = {}) => ({
@@ -106,4 +106,36 @@ test('已有一批已归档会话时，关闭自动归档换新：只放过自�
   assert.equal(canTouchOwn(own, 's-newly-rotated'), true)
   // 已有归档集合本身不被改动（插件没有任何 unarchive 路径）
   assert.deepEqual(archivedBefore, ['s-arch-1', 's-arch-2', 's-arch-3'])
+})
+
+// ---------- ownSessions 裁剪：state.json 不无限长，待归档的一个不丢 ----------
+
+test('ownSessions 未超上限时原样返回（顺序不变）', () => {
+  const ids = ['s-1', 's-2', 's-3']
+  assert.deepEqual(trimOwnSessions(ids, new Set()), ids)
+  assert.deepEqual(trimOwnSessions(ids, new Set(), 10), ids)
+})
+
+test('超过上限只留最近 N 个，最老的那端被删', () => {
+  const ids = Array.from({ length: 10 }, (_, i) => `s-${i}`)
+  assert.deepEqual(trimOwnSessions(ids, new Set(), 3), ['s-7', 's-8', 's-9'])
+  assert.deepEqual(trimOwnSessions(ids, new Set(), 1), ['s-9'])
+})
+
+test('待归档的旧会话被钉住：再老也不删，且顺序不乱', () => {
+  const ids = Array.from({ length: 6 }, (_, i) => `s-${i}`)
+  // s-0 最老但正在等延迟归档，必须留；cap=3 只保留 s-3..s-5 + s-0
+  assert.deepEqual(trimOwnSessions(ids, new Set(['s-0']), 3), ['s-0', 's-3', 's-4', 's-5'])
+  // 钉住多个
+  assert.deepEqual(trimOwnSessions(ids, ['s-0', 's-2'], 2), ['s-0', 's-2', 's-4', 's-5'])
+})
+
+test('裁剪不吃脏数据：非字符串/空串过滤掉，非法 cap 回落默认', () => {
+  assert.deepEqual(trimOwnSessions([null, '', 's-1', 42, 's-2'], new Set()), ['s-1', 's-2'])
+  assert.deepEqual(trimOwnSessions(undefined, new Set()), [])
+  const many = Array.from({ length: OWN_CAP + 5 }, (_, i) => `s-${i}`)
+  // cap 传 0 / 负数 / NaN 都回落默认上限，不会把名单清空
+  assert.equal(trimOwnSessions(many, new Set(), 0).length, OWN_CAP)
+  assert.equal(trimOwnSessions(many, new Set(), -3).length, OWN_CAP)
+  assert.equal(trimOwnSessions(many, new Set(), NaN).length, OWN_CAP)
 })
