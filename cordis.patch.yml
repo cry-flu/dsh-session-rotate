@@ -1,0 +1,5 @@
+# dsh-session-rotate —— bundle patch（刻意留空）
+#
+# 挂载条目写在 profile 的 cordis.patch.yml 里（那里同时放 workspaces 配置），
+# 这样配置只有一处、热重载也只走一个入口，避免 bundles 与 profile patch 各插一份。
+[]

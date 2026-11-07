@@ -1,0 +1,43 @@
+name: Bug 报告
+description: 换新没按预期发生、摘要内容不对、设置页报错等
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请尽量附上 `~/.dsh/session-rotate/debug.log` 里相关的几行——换新判定、冷却、dry-run 的每个分支都会在那里留痕。
+        另外说明一下：**上限是软上限**，真实换新步数在 `maxSteps` 附近浮动是设计如此，不是 bug（见 README「触发时机与范围」）。
+  - type: input
+    id: version
+    attributes:
+      label: 插件版本
+      description: 见 `debug.log` 的「已加载 v…」那一行
+      placeholder: v1.0.0
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      description: DSH 版本、操作系统、Node 版本（跑测试时用）
+      placeholder: DSH 桌面版 / Windows 11 / Node 24.18.0
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: 现象
+      description: 发生了什么，期望发生什么
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: 相关配置
+      description: `session-rotate/config.json`（去掉敏感信息）与 profile 里 `cordis.patch.yml` 的挂载段
+      render: json
+  - type: textarea
+    id: log
+    attributes:
+      label: debug.log 片段
+      render: text
