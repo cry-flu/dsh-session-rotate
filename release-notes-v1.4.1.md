@@ -5,6 +5,8 @@
 
 1.4.0 没有单独发过版（没打过 tag），这是第一个带此修复的发布。
 
+**本次重打包补入**（运行时代码无改动）：重录的 6 镜头演示 GIF，以及 README 一条使用提醒 —— 延迟归档的保留期内不要在旧会话里继续发消息：顺延只在轮与轮之间重算，跑得比剩余保留期长的那一轮会被 `stopActivity` 的归档中途掐掉并归档，任务做一半就断。
+
 完整变更见 [CHANGELOG.md](https://github.com/cry-flu/dsh-session-rotate/blob/main/CHANGELOG.md)。
 
 **安装**

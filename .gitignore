@@ -33,3 +33,5 @@ desktop.ini
 
 # 平台用量导出（本地分析用，不入库）
 usage-raw/
+
+# 发版临时工作树.n.tmp-release/
