@@ -5,7 +5,7 @@
 
 ## 0. 现状一句话
 
-插件已发布到 `https://github.com/cry-flu/dsh-session-rotate`，当前正式版 `v1.4.1`。本地 `main` 已提交、**未 push**（本地提交不影响对外，push 需要维护者说「执行」）。
+插件已发布到 `https://github.com/cry-flu/dsh-session-rotate`，当前正式版 `v1.4.2`（2026-11-08）。本机 `main` 与 `origin/main` 齐平。
 
 ## 1. 发版与版本号（硬规矩）
 
@@ -78,3 +78,13 @@ npm 上已有同名包（或版本号被占用）时，**不要自己改名发�
 - 本机出网踩坑：`C:\Windows\System32\drivers\etc\hosts:30` 早先被钉成 `20.27.177.113 github.com`，该 IP 443 超时（`api.github.com`/`codeload`/`ssh` 反而通），git push 报 `Connection was reset`。改成 `140.82.113.3 github.com` 后直连恢复 200；原文件备份在 `hosts.bak-20261108`
 - 包内容确认：`files` 字段只收 `lib/ cordis.patch.yml README.md README.en.md CHANGELOG.md LICENSE`，**tgz 里从来没有 `docs/`**，所以「Release 附件与仓库 GIF 不一致」这个说法不成立 —— 图只存在于仓库与 GitHub Pages
 - 待办：真换新三场景实测（要改真 HOME 的 `config.json`，跑起来会真换会话，需维护者点头）
+
+## 4. 1.4.2 已发版（2026-11-08）
+
+**发版提交内容**（`M CHANGELOG.md`、`M NOTES.md`、`M README.md`、`M README.en.md`、`M lib/index.js`、`M package.json`、`M PROMO.md`、`M docs/index.md`、`M .gitignore`；新增 `docs/usage-data.md`、`test/deferred.test.mjs`；`.tmp-release/` 已 ignore）。
+
+- 文档（上一轮已做）：实测参考整节搬到 `docs/usage-data.md`（README 只留表+一句话+链接）；「11-07 跑的还是 1.1.x」→「当天版本还是 0.2.1–1.0.0」；常用组合末行 `switchOnArchive` 标「任意」并补两种等价实现；`README.en.md` 同步。
+- 数据订正：平台 CSV 是 `+08:00` 本地时、`debug.log` 是 UTC；「11-03 当天下午已有换新」不成立（首条加载 = 本地 11-04 00:03，本地 11-03 零次换新）；换新 46 次按本地日 = 11-04 4 / 11-07 26 / 11-08 16；11-03 那行可由整日导出复算（与表七列逐位一致），`docs/usage-data.md` 已把这行显式标成「可复算」并写明口径与复算命令。
+- **代码已改（1.4.2）**：到点归档不再传 `stopActivity`。`archiveDeferredOnce`（`lib/index.js:1033`）先探 `workspace/session-activity`（宿主判据在 `dsh-workspace/lib/index.js:531-532`，四族 provider：turn/job/subagent/schedule）→ 有活顺延 `RETRY_MS` 60 秒（`lib/index.js:163`）→ 最多 `MAX_DEFERRALS` 10 次（`lib/index.js:166`）→ 用尽放弃归档、条目删除、会话原样留着；归档调用 `archiveSession(fromId)`（`lib/index.js:1099`），宿主抛 `WorkspaceActiveSessionError` 就接住继续顺延。`retries` 随 `state.json` 持久化；`turn/end`（`lib/index.js:826`）对「被挡过的轮」在结束 3 秒后 `nudgeDeferred`（`lib/index.js:1006`）补做；`deferredBusy`（`lib/index.js:876`）防定时器与补做撞车。换新即时归档仍带 `stopActivity: true`（`lib/index.js:1306`，那时这一轮已经结束）。
+- 测试：新增 `test/deferred.test.mjs`（3 条纯函数 + 4 条集成，集成用临时 `DSH_HOME` + 假 ctx 跑真 `apply()`），`npm test` 53 pass / 0 fail。
+- 起发版流程前先看第 1 节：push / tag / Release / npm 发布都要维护者回「执行」。

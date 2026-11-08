@@ -3,6 +3,27 @@
 本项目的所有重要改动都记在这里。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [1.4.2] — 2026-11-08
+
+延迟归档到点撞上还在跑的活，不再可能把它掐断：顺延，最多 10 分钟，之后放弃归档、会话原样留在侧边栏。
+
+### 修复
+
+- **到点归档不再传 `stopActivity`。** 先问宿主这个会话还有没有活（`workspace/session-activity` 瀑布，`archiveDeferredOnce`，`lib/index.js:1033`），有活就顺延 60 秒重查（`RETRY_MS`，`lib/index.js:163`），最多 10 次（`MAX_DEFERRALS`，`lib/index.js:166`）；顺延用尽就放弃归档、会话留在侧边栏，日志记一行「旧会话一直有活，放弃到点归档」。
+- 归档调用改成 `archiveSession(fromId)` 不带第二参（`lib/index.js:1099`）：宿主在这几毫秒里又判活跃会抛 `WorkspaceActiveSessionError`，插件接住继续顺延，整条路径没有强杀。换新即归档那条（`archiveOnRotate`）仍然是 `stopActivity: true`（`lib/index.js:1306`），那时这一轮已经结束了。
+- 待办条目新增 `retries` 并随 `state.json` 持久化；只有归档成功或放弃才删条目，顺延途中不丢。被挡过的那一轮结束后 3 秒补做一次（`turn/end`，`lib/index.js:826` → `nudgeDeferred`，`lib/index.js:1006`），没被挡过的照旧顺延整段保留期（`refreshDeferred`，`lib/index.js:972`）。
+- 定时器与 `turn/end` 补做可能同时到，加 `deferredBusy` 占位，同一条待办不会归档两次（`lib/index.js:876`）。
+
+### 测试
+
+- 新增 `test/deferred.test.mjs`：3 条 `deferredStep` 纯函数用例（归档 / 顺延 / 顺延用尽）+ 4 条集成用例（临时 `DSH_HOME` + 假 ctx 跑真 `apply()`，断言有活不归档、归档不带 `stopActivity`、`retries`/`deadline` 落盘、`WorkspaceActiveSessionError` 继续顺延、顺延用尽放弃）。`npm test` 53 pass / 0 fail（原 46 + 新 7）。
+
+### 文档
+
+- README / `README.en.md` / `docs/index.md` 的延迟归档说明与「已知限制」改成顺延语义（原文还写着「那一轮会被中途归档」「不要在旧会话里发消息」）。
+- `docs/usage-data.md` 三行显式标成「可复算」，写明口径与复算命令（`tools/usage-summary.ps1 -Path <zip>`）。
+- `PROMO.md` 里的本机路径换成 `<仓库目录>` / `<ffmpeg.exe 路径>` / `<一个干净的临时 HOME>` 占位。
+
 ## [1.4.1] — 2026-11-08
 
 修复 1.4.0 里设置页一个开关的显示条件。1.4.0 没有单独发过版（没打过 tag），第一个带此修复的发布就是 1.4.1。本版号重打包过一次：补入重录的演示 GIF 与 README 使用提醒，运行时代码无改动。

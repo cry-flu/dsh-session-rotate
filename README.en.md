@@ -77,7 +77,7 @@ Config lives in `~/.dsh/session-rotate/config.json`; the settings page edits the
 | `maxRotations` | `3` | Rotating that many times inside `cooldown × maxRotations` pauses the workspace (state lives in `state.json` and survives restarts) |
 | `dryRun` | `false` | Dry-run switch |
 | `archiveOnRotate` | `true` | Archive the old session on rotation; `false` keeps it in the sidebar — clean it up yourself when you no longer need it (the last reply is still pasted in full into the handoff) |
-| `deferArchiveMinutes` | `0` | How long the old session stays unarchived after a rotation, so you can open it from the sidebar and read its last reply (the default view hides archived sessions); `0` archives immediately, matching 1.0.0; using the old session inside that window extends it at the end of that turn (a turn that outlasts the window left is archived mid-flight — see Known limitations) |
+| `deferArchiveMinutes` | `0` | How long the old session stays unarchived after a rotation, so you can open it from the sidebar and read its last reply (the default view hides archived sessions); `0` archives immediately, matching 1.0.0; using the old session inside that window re-counts the whole window at the end of that turn; if the session still has work running at the deadline (a turn, a subagent, a background job, a scheduled reminder) the archive slips a minute at a time, up to 10 times — see Known limitations |
 | `autoSwitch` | `true` | Whether the UI switches to the new session after a rotation; `false` still creates the session and delivers the handoff, but the UI stays on the old one and the new session only shows up in the sidebar. While `false`, archiving depends on the next key: at the deadline the UI is moved to the new session first |
 | `switchOnArchive` | `true` | Only active when `autoSwitch=false` and `deferArchiveMinutes>0`: at the deadline the UI is switched to the new session first, then the old session is archived, so the session you are reading never turns into "temporarily unavailable". With `false` the UI never jumps and the old session is never archived |
 
@@ -94,14 +94,16 @@ Four switches get confusing fast; look up the effect you want instead. Defaults 
 | Default: rotate, jump to the new session, archive the old one at once (same as 1.0.0) | **`true`** | **`true`** | **`0`** | no effect |
 | Keep the old session in the sidebar and clean it up yourself | **`true`** | `false` | any | no effect |
 | Do not jump, but archive the old session after N minutes (the UI is moved to the new session first) | `false` | **`true`** | `N` (>0) | **`true`** |
-| Never touch the old session (no jump either) | `false` | any | `0`, or `switchOnArchive=false` | `false` |
+| Never touch the old session (no jump either) | `false` | any | any | any |
+
+The last row's "any" has two equivalent implementations: `deferArchiveMinutes=0`, where there is no deadline at all and `switchOnArchive` is never consulted; or `deferArchiveMinutes>0` with `switchOnArchive=false`, where the deadline arrives but neither the UI moves nor the old session is archived.
 
 Where a setting stops mattering:
 
 - `switchOnArchive` only means something when `autoSwitch=false` **and** `deferArchiveMinutes>0`; with `autoSwitch=true` it is ignored (the panel hides it).
 - With `autoSwitch=false`, `deferArchiveMinutes=0` or `switchOnArchive=false` makes `archiveOnRotate` moot — the old session is always kept, because you are still looking at it.
 - With `archiveOnRotate=false`, `deferArchiveMinutes` is moot: there is nothing to archive, so there is no deadline.
-- The whole policy is `archivePlan` (`lib/index.js:184-196`); the four rows above are its complete behaviour, there are no hidden branches.
+- The whole policy is `archivePlan` (`lib/index.js:208-221`); the four rows above are its complete behaviour, there are no hidden branches.
 
 ## Test it with the dry run
 
@@ -131,20 +133,11 @@ rm -rf ~/.dsh/session-rotate      # optional: logs, pause state and delta histor
 - **The first turn of a new session is a real request.** The handoff summary is sent as the first user message; the summary itself is free, but that turn is billed like any other and costs a few tokens.
 - Only top-level sessions are covered, sub-sessions are skipped; each session fires at most once; a paused workspace is resumed with `POST /dsh-session-rotate/config` and `{"clearPause": true}`, or by deleting `~/.dsh/session-rotate/state.json` and restarting the plugin.
 - **The deferred archive moves the UI first.** On the "no jump + clean up after N minutes" path, `switchOnArchive` moves the UI to the new session at the deadline, and the old session is archived `SWITCH_LEAD_MS` (3 s, `lib/index.js:160`) later. If you are typing in the old session at that moment, the input box goes with the session switch — unsent text does not come along.
-- **Do not send another message into the old session while it is still inside the deferral window.** The extension is only recomputed between turns (`turn/end` → `refreshDeferred`, `lib/index.js:802`, `lib/index.js:937`), so if the turn you start runs longer than the time left, the deadline still fires; the archive runs with `stopActivity: true` (`lib/index.js:988`), which cuts the running turn off and archives the whole session — the task dies half-way. Read the old session if you want to, but do not talk to it; if there is work left, do it in the new session.
-- **Deferred archives queued under 1.2.0 are never completed after an upgrade.** Archiving has to pass `canTouchOwn` (`lib/index.js:961`), and the `ownSessions` list only exists since 1.3.0: sessions rotated out by 1.2.0 were never recorded there, so after an upgrade the deadline only writes a `skipped: not rotated out by this plugin` line and drops that pending entry instead of retrying. Clean those sessions up by hand.
+- **A deadline that lands on running work slips; it never kills it.** At the deadline the plugin first asks the host whether that session still has activity (`workspace/session-activity` waterfall, `archiveDeferredOnce`); if it does, it slips a minute and asks again, up to 10 times (`MAX_DEFERRALS`). When the slips run out the session is simply left alone and stays in the sidebar, with an `old session still busy, giving up` line in the log. The archive call itself is `archiveSession(id)` **without** `stopActivity`: if the host still judges the session active in those few milliseconds it throws `WorkspaceActiveSessionError`, which the plugin catches and treats as one more slip — so a running turn is never cut off. The cost is that a session may stay around for up to ~10 minutes; clean it up by hand once it is idle. Sending another message into the old session inside the window still re-counts the whole window at the end of that turn.
+- **Deferred archives queued under 1.2.0 are never completed after an upgrade.** Archiving has to pass `canTouchOwn` (`lib/index.js:1038`), and the `ownSessions` list only exists since 1.3.0: sessions rotated out by 1.2.0 were never recorded there, so after an upgrade the deadline only writes a `skipped: not rotated out by this plugin` line and drops that pending entry instead of retrying. Clean those sessions up by hand.
 - **The handoff summary is a startup cost for the new session.** The previous reply (up to 4000 chars) is sent as the new session's first user message and then rides along as context on every request; cache hits keep it cheap, but the new session really does start with a bigger context than an empty one.
 
 ## Measured reference
-
-Platform exports from 2026-11-08 (`usage_data_*.zip`, one `amount` and one `cost` CSV each), aggregated per day. The raw files are not committed (`usage-raw/` is gitignored), but **the 10-31 and 11-07 rows can be recomputed**: `tools/usage-summary.ps1` reads the zip (or an extracted folder) and uses the same definitions as the table below.
-
-```powershell
-pwsh -File tools\usage-summary.ps1 -Path E:\download\usage_data_2026-11-07_2026-11-07.zip
-# | 2026-11-07 | 1,418 | 85,801,186 | 98.2% | 6.3266 | 60,509 | 0.446 |
-```
-
-Definitions: requests = sum of `request_count`; total tokens = `input_cache_hit_tokens` + `input_cache_miss_tokens` + `output_tokens`; cache hit rate = hit ÷ (hit + miss); cost = sum of the `cost` column (CNY); the last two columns are derived. Only these per-day figures are used:
 
 | Date | Requests | Total tokens (input + output) | Cache hit rate | Cost (CNY) | Tokens per request | Cost per 100 requests (CNY) |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -152,21 +145,9 @@ Definitions: requests = sum of `request_count`; total tokens = `input_cache_hit_
 | 2026-11-03 | 273 | 38,111,601 | 96.4% | 2.9166 | 139,603 | 1.068 |
 | 2026-11-07 | 1,418 | 85,801,186 | 98.2% | 6.3266 | 60,509 | 0.446 |
 
-The 10-31 and 11-07 rows were each recomputed from the original export with `tools/usage-summary.ps1` and match digit for digit (10-31: 68 amount rows over 17 hourly buckets; 11-07: 64 rows over 16). The 11-03 export was not kept, so **that row has no verifiable input** — it is only the summary recorded at the time.
+One line: tokens per request drop from 139,357 (10-31) to 60,509 (11-07), about -57%; but the request volume differs by an order of magnitude (1,565 / 273 / 1,418) and on 11-07 the plugin was still at 0.2.1–1.0.0 — these are **observed figures**, not a causal "the plugin saved this much" claim.
 
-One line: tokens per request drop from 139,357 (10-31) to 60,509 (11-07), about -57%; but the request volume differs by an order of magnitude (1,565 / 273 / 1,418) and 11-07 still ran 1.1.x — these are **observed figures**, not a causal "the plugin saved this much" claim.
-
-Five caveats before reading the table:
-
-1. Single user, single environment (Windows desktop + `deepseek-flash`); the three days differ in workload (1,565 / 273 / 1,418 requests), so **days with different volume are not directly comparable**.
-2. Other changes landed in the same period: auto-reply turned off, long sessions archived, token-saving rules added. The drop cannot be attributed to this plugin alone.
-3. 11-03 is not a "before the plugin" day: the earliest `loaded` line in the local `debug.log` is `2026-11-03T16:03:47Z`, and that afternoon already had one real rotation. The only true "before" day here is 10-31.
-4. On 11-07 the plugin was at 0.2.1–1.0.0 (`CHANGELOG` dates 1.1.0 to 2026-11-08), not 1.4.1; neither the deferred archive of 1.2.0 nor the switch options of 1.3.x are reflected in these numbers.
-5. The 11-03 CSV also contains 4 `function_call` counts; that is not a token type and is excluded from the table.
-
-**To be filled** (no data, no estimates): the full 11-08 day (exportable only after the day ends) and the average context size of sessions before/after a rotation (the exports have no session dimension).
-
-Direct evidence that the plugin runs (local `debug.log`, as of `2026-11-08T03:20Z`): 43 rotations in total (11-03: 1, 11-04: 3, 11-06: 12, 11-07: 24, 11-08: 3), of which 7 were kept for review first and 5 reached the deferred archive. This proves activity, not savings.
+Definitions, time zones (the platform CSV is `+08:00` local time, `debug.log` is UTC), the recompute command, the original export behind each row, and all five caveats (single user, days with different volume are not comparable, other changes landed in the same period) live in [docs/usage-data.md](docs/usage-data.md).
 
 ## Testing status
 

@@ -77,7 +77,7 @@ cmd /c mklink /J "<profile>\node_modules\dsh-session-rotate" "<插件目录绝�
 | `maxRotations` | `3` | 在 `cooldown × maxRotations` 窗口里换满即暂停该工作区（状态存 `state.json`，重启不清零） |
 | `dryRun` | `false` | 试运行开关 |
 | `archiveOnRotate` | `true` | 换新时归档旧会话；设 `false` 则旧会话会留在侧边栏，请自行定期清理（上一轮正文仍会整段贴进交接摘要） |
-| `deferArchiveMinutes` | `0` | 换新后旧会话先留多少分钟再归档，留的这段时间它在侧边栏里可直接点开看最后一条回复（默认视图不显示已归档会话）；`0` = 换新即归档（与 1.0.0 行为一致）；保留期内旧会话又被用到会自动顺延 |
+| `deferArchiveMinutes` | `0` | 换新后旧会话先留多少分钟再归档，留的这段时间它在侧边栏里可直接点开看最后一条回复（默认视图不显示已归档会话）；`0` = 换新即归档（与 1.0.0 行为一致）；保留期内旧会话又被用到，会在那一轮结束时把整段保留期重新计一遍；到点时这个会话还有活在跑就往后顺 1 分钟（最多 10 次），见「已知限制」 |
 | `autoSwitch` | `true` | 换新后是否把界面切到新会话；设 `false` 则仍然建新会话、投递交接摘要，但界面停在旧会话，新会话只出现在侧边栏。此时归档要看下一项：到点会先把你切到新会话再归档 |
 | `switchOnArchive` | `true` | 只在 `autoSwitch=false` 且 `deferArchiveMinutes>0` 时起作用：到点先把界面切到新会话，再归档旧会话，免得你正看着的会话变成「暂时无法查看」。设 `false` 则界面既不会自动跳、旧会话也永不归档 |
 
@@ -101,7 +101,7 @@ cmd /c mklink /J "<profile>\node_modules\dsh-session-rotate" "<插件目录绝�
 - `switchOnArchive` 只在 `autoSwitch=false` **且** `deferArchiveMinutes>0` 时有意义；`autoSwitch=true` 时它不生效（设置页也不会显示这一项）。
 - `autoSwitch=false` 时，`deferArchiveMinutes=0` 或 `switchOnArchive=false` 会让 `archiveOnRotate` 不生效 —— 旧会话一定保留，因为人还停在上面。
 - `archiveOnRotate=false` 时，`deferArchiveMinutes` 不生效：没有「要归档」这件事，也就没有到点。
-- 判定逻辑就在 `lib/index.js` 的 `archivePlan`（`lib/index.js:184-196`），上面四行是它的全部行为，没有隐藏分支。
+- 判定逻辑就在 `lib/index.js` 的 `archivePlan`（`lib/index.js:208-221`），上面四行是它的全部行为，没有隐藏分支。
 
 ## 用试运行测（dryRun）
 
@@ -131,7 +131,8 @@ rm -rf ~/.dsh/session-rotate      # 可选：连日志、暂停状态、增量�
 - **换新后的第一轮是一次真实请求。** 新会话把交接摘要作为第一条用户消息发出去，摘要本身零成本，但那一轮对话照常计费，会产生少量 token 费用。
 - 只对顶层会话生效，子会话跳过；每个会话只触发一次；被暂停的工作区用 `POST /dsh-session-rotate/config` 带 `{"clearPause": true}` 恢复，或删 `~/.dsh/session-rotate/state.json` 后重启插件。
 - **延迟归档到点会先把界面切走。** 走「不跳转 + N 分钟后清理」这条路时，到点由 `switchOnArchive` 先把界面切到新会话，`SWITCH_LEAD_MS`（3 秒，`lib/index.js:160`）之后才归档旧会话。如果那一刻你正在旧会话里打字，界面切走会把输入框一起带走 —— 没发出去的内容不会跟着过来。
-- **1.2.0 时期排队的延迟归档，升级后不会被补上。** 归档前要过 `canTouchOwn` 这道闸（`lib/index.js:961`），而 `ownSessions` 名单是 1.3.0 才有的：1.2.0 换出来的旧会话 id 从来没被记进那份名单，所以升级后到点只会记一行 `跳过归档：…不在本插件换出的会话名单里，未动它`，那条待办同时被丢掉、不会重试。这些会话需要你自己在侧边栏清理。
+- **保留期到点撞上正在跑的活：顺延，不掐断。** 到点先问宿主这个会话还有没有活在跑（`workspace/session-activity` 瀑布，`archiveDeferredOnce`），有就顺延 1 分钟再问，最多 10 次（`MAX_DEFERRALS`）；顺延用尽还有活就放弃归档、会话原样留在侧边栏，日志记一行「旧会话一直有活，放弃到点归档」。归档调用 `archiveSession(id)` **不带** `stopActivity`，宿主在这几毫秒里又判活跃会抛 `WorkspaceActiveSessionError`，插件接住继续顺延 —— 任何情况下都不会掐断正在跑的那一轮。代价是会话可能一直留着（最长约 10 分钟）；想马上清掉就等它闲下来手动归档。
+- **1.2.0 时期排队的延迟归档，升级后不会被补上。** 归档前要过 `canTouchOwn` 这道闸（`lib/index.js:1038`），而 `ownSessions` 名单是 1.3.0 才有的：1.2.0 换出来的旧会话 id 从来没被记进那份名单，所以升级后到点只会记一行 `跳过归档：…不在本插件换出的会话名单里，未动它`，那条待办同时被丢掉、不会重试。这些会话需要你自己在侧边栏清理。
 - **交接摘要是新会话的起步成本。** 上一轮回复全文（≤4000 字）会作为新会话第一条用户消息发出，之后随上下文每步重发；缓存命中后单价极低，但新会话的起步上下文确实比空会话大。
 
 ## 实测参考

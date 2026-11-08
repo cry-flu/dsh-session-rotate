@@ -116,8 +116,10 @@
 
 `tools\record-cdp.ps1` 起一个**独立的临时 DSH_HOME + 无头 Chrome**，用 CDP 截页面，不碰你的屏幕：屏幕上开着什么窗口都录不进去，演示用的工作区是脚本自己造的假名字（`demo-app` / `landing-page` / `sdk-samples`），画面里出现的路径是临时 HOME 下的中性路径（脚本默认 `C:\ProgramData\dsh-rotate-demo-home\...`，仓库里这条 GIF 录的就是它），没有用户名、没有你的仓库路径。
 
+下文命令里的 `<仓库目录>`、`<ffmpeg.exe 路径>`、`<一个干净的临时 HOME>` 都是占位，按你本机的路径替换。
+
 ```powershell
-cd 'D:\dsh-plugins\dsh-session-rotate'
+cd <仓库目录>
 pwsh -NoProfile -File .\tools\record-cdp.ps1
 # 产出 docs\img\demo.gif 和 docs\img\demo.timeline.json（后者记 6 个镜头的帧号/秒数）
 ```
@@ -125,7 +127,7 @@ pwsh -NoProfile -File .\tools\record-cdp.ps1
 - 需要：Node 22+（用内置 WebSocket，不用 `npm install`）、ffmpeg、Chrome 或 Edge、`dsh` 在 PATH 上。
 - 第一次跑会往那个临时 HOME 装一次插件（走网络）；装不了或已装好可以加 `-SkipPluginInstall`，另用 `-PluginRef <npm 或 github 地址>` 换来源。
 - 常用参数：`-Out docs\img\demo.gif -Port 3399 -CdpPort 9222 -Fps 14`；想留中间帧/调色板加 `-Keep`；Chrome、ffmpeg 位置特殊时用 `-Chrome` / `-Ffmpeg`。
-- 想复用自己的干净 HOME：`-DshHome D:\tmp\demo-home`。**不要指向日常的 `~/.dsh`**，否则真实工作区名和配置路径会被录进画面。
+- 想复用自己的干净 HOME：`-DshHome <一个干净的临时 HOME>`。**不要指向日常的 `~/.dsh`**，否则真实工作区名和配置路径会被录进画面。
 - 插件没装上、或装上了没挂载（页面上根本没有「会话换新」这一栏）时，脚本会直接报错退出并打印日志尾部，不会录出一张废片。
 
 ### 路线 B：录真实界面（GDI 抓屏，谨慎）
@@ -133,14 +135,14 @@ pwsh -NoProfile -File .\tools\record-cdp.ps1
 `tools\record-demo.ps1` 抓窗口客户区 → ffmpeg 两遍调色板压成 GIF（自动压到 ≤3 MB）。
 
 ```powershell
-cd 'D:\dsh-plugins\dsh-session-rotate'
+cd <仓库目录>
 pwsh -NoProfile -File .\tools\record-demo.ps1 -WindowTitle 'DeepSeek Harness' -Seconds 30 -StartDelay 8
 ```
 
 **它录的是你屏幕上的像素**：任何盖在目标窗口上的窗口都会被一起录进去——包括左边栏的会话标题、设置页里的工作区真名、日志面板里的 `C:\Users\<你>\...` 和 session UUID。往 public 仓库发图请用路线 A；非要用这条，先关掉所有会重叠的窗口，录完**逐帧看一遍**再压。
 
 - 用 `-WindowTitle` 锁窗口（不传就录跑脚本那一刻的前台窗口）；录的是**窗口客户区**，不带任务栏。
-- ffmpeg 自动在 PATH 和 `D:\tools\ffmpeg\bin` 等处找；找不到用 `-Ffmpeg <路径>`。
+- ffmpeg 自动在 PATH 和常见安装目录里找；找不到用 `-Ffmpeg <ffmpeg.exe>`。
 - 超 3 MB 会自动降到 10/8/6 fps 或 900/800/700 px 重压；仍超就 `-Seconds` 调短。
 - 想留原始帧复查：加 `-KeepFrames`（会打印帧目录，默认录完删掉）。
 
@@ -157,13 +159,13 @@ pwsh -NoProfile -File .\tools\record-demo.ps1 -WindowTitle 'DeepSeek Harness' -S
 
 ### 路线 D：先录 mp4 再压（OBS / Win+G）
 
-ffmpeg 本机已有：`D:\tools\ffmpeg\bin\ffmpeg.exe`（9.0.2，只是不在 PATH 里）。
+需要 ffmpeg 9.x（9.0.2 实测可用；装在 PATH 上最省事，不在 PATH 就用 `-Ffmpeg` 指定）。
 
 录 mp4（`Win+G` Xbox Game Bar，或 OBS 只录窗口），存成 `demo.mp4`，然后两遍调色板压制（第二遍才出高质量小体积 GIF）：
 
 ```powershell
-cd 'D:\dsh-plugins\dsh-session-rotate'
-$ff = 'D:\tools\ffmpeg\bin\ffmpeg.exe'
+cd <仓库目录>
+$ff = '<ffmpeg.exe 路径>'
 & $ff -y -i demo.mp4 -vf "fps=12,scale=1000:-1:flags=lanczos,palettegen=stats_mode=diff" palette.png
 & $ff -y -i demo.mp4 -i palette.png -lavfi "fps=12,scale=1000:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" -loop 0 docs\img\demo.gif
 (Get-Item docs\img\demo.gif).Length / 1MB
