@@ -3,13 +3,21 @@
 本项目的所有重要改动都记在这里。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [1.4.1] — 2026-11-08
+
+修复 1.4.0 里设置页一个开关的显示条件。1.4.0 没有单独发过版（没打过 tag），第一个带此修复的发布就是 1.4.1。
+
+### 修复
+
+- 设置页「归档到点时自动跳到新会话」的显示条件原先只判 `autoSwitch`，于是「归档前先留」填 `0` 时这一行照样出现、勾上也不生效（`archivePlan` 此时返回 `'none'`，根本不会建立延迟归档）。现在改为 `autoSwitch || !(deferArchive > 0)` 才不渲染（`lib/client.js:470`、`lib/client.js:482`），界面、文案、服务端判定三者一致。
+
 ## [1.4.0] — 2026-11-08
 
 关掉「换新后自动跳到新会话」也能用延迟归档了：到点先把界面切到新会话，再归档旧会话；这个「到点先跳」本身也可以关掉。
 
 ### 新增
 
-- `switchOnArchive`（默认 `true`）：只在 `autoSwitch=false` 且 `deferArchiveMinutes>0` 时生效。到点归档前先把界面切到新会话，`SWITCH_LEAD_MS`（3 秒）之后再真正归档，避免你正看着的会话变成「暂时无法查看」。设 `false` 则界面不跳、旧会话永不归档。设置页对应勾选「归档到点时自动跳到新会话」，只在「换新后自动跳到新会话」取消勾选、且「归档前先留」大于 0 时才出现（与 `archivePlan` 一致）。
+- `switchOnArchive`（默认 `true`）：只在 `autoSwitch=false` 且 `deferArchiveMinutes>0` 时生效。到点归档前先把界面切到新会话，`SWITCH_LEAD_MS`（3 秒）之后再真正归档，避免你正看着的会话变成「暂时无法查看」。设 `false` 则界面不跳、旧会话永不归档。设置页对应勾选「归档到点时自动跳到新会话」，只在「换新后自动跳到新会话」取消勾选时才出现。
 
 ### 变更
 
@@ -18,10 +26,6 @@
 - `/dsh-session-rotate/state` 的 `pending` 新增 `switch` 与 `reason` 字段：跳不跳由服务端逐次算好，客户端不再自己读开关；`reason='archive'` 那一跳只在「当前正看着被归档的会话」时才动界面。
 - `state.json` 的 `deferredArchives` 条目多存 `workspaceId`（旧条目缺它就只归档、不跳）。
 - 配置警告（`configWarnings`）与保存日志文案同步：只有 `autoSwitch` 和 `switchOnArchive` 都关才提示「归档设置不生效」。
-
-### 修复
-
-- 设置页「归档到点时自动跳到新会话」的显示条件原先只判 `autoSwitch`，于是「归档前先留」填 `0` 时这一行照样出现、勾上也不生效（`archivePlan` 此时返回 `'none'`，根本不会建立延迟归档）。现在改为 `autoSwitch || !(deferArchive > 0)` 才不渲染（`lib/client.js:470`、`lib/client.js:482`），界面与文案、与服务端判定三者一致。
 
 ## [1.3.1] — 2026-11-08
 
