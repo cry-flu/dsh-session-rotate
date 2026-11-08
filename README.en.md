@@ -13,7 +13,7 @@ Long sessions get more expensive with every turn. When a session reaches its ste
 - Runs as a profile plugin inside DeepSeek Harness (DSH) Desktop / Web GUI.
 - **Not on npm.** The npm name `dsh-session-rotate` belongs to a different plugin by another author — that is not this project.
 
-![Settings → Session rotate: tick workspaces, set a step limit, applied on save](docs/img/demo.gif)
+![Settings → 会话换新: turning off "switch to the new session" reveals "switch when the archive fires"; set a 1-minute grace window and save](docs/img/demo.gif)
 
 ## Features
 
@@ -125,7 +125,7 @@ Most of the code was AI-assisted, then human-reviewed and tested locally, but be
 
 ![Settings → 会话换新: default step limit, workspace list, protection gates and dry run](docs/img/session-rotate-settings.png)
 
-Settings → 会话换新. The top field is the **default step limit** (it only applies to workspaces that are checked but leave their step field empty). The middle block is the **workspace list**: check to enable, type a number to pin that workspace's own limit, leave it empty to follow the default. The bottom block is **protection gates and dry run**: the screenshot only reaches 最小步数 (minimum steps) and 冷却（分钟）(cooldown); below them sit the maximum rotations and the 试运行 (dry run, log only) switch.
+Settings → 会话换新. The top field is the **default step limit** (it only applies to workspaces that are checked but leave their step field empty). The middle block is the **workspace list**: check to enable, type a number to pin that workspace's own limit, leave it empty to follow the default. The bottom block is **protection gates and dry run**: minimum steps, cooldown in minutes, maximum rotations, the 试运行 (dry run, log only) switch, 换新时归档旧会话 (archive the old session on rotate) with its 归档前先留（分钟）(keep it visible for N minutes), 换新后自动跳到新会话 (switch to the new session automatically), and 归档到点时自动跳到新会话 (switch when the archive fires), which only shows up once the previous switch is off — checked in the screenshot. At the very bottom sit 保存 (save), 重新读取 (reload) and the recent log.
 
 ## License
 
