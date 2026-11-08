@@ -30,3 +30,6 @@ desktop.ini
 
 # npm pack 产物
 *.tgz
+
+# 平台用量导出（本地分析用，不入库）
+usage-raw/

@@ -5,10 +5,11 @@
 
 ---
 
-## 一、v1.0.0 Release Notes（直接整段贴进 GitHub release 正文）
+## 一、v1.0.0 Release Notes（已发布，这里只留底）
 
-> 编辑入口：https://github.com/cry-flu/dsh-session-rotate/releases/edit/v1.0.0
-> 没有 `gh` CLI，走网页编辑即可；或者装 `gh` 后用 `gh release edit v1.0.0 -F PROMO.md`（只取下面代码块里的部分）。
+> 线上正文就是下面代码块里这段（https://github.com/cry-flu/dsh-session-rotate/releases/tag/v1.0.0 ），它是 v1.0.0 当时的快照，别拿现在的数字回填历史版本：其中 `npm test` 写的是当时的 23 pass，仓库现在跑出来是 46 pass。
+> 一字不差的例外只有一处：代码块里 `npm test → 23 pass / 0 fail` 那句末尾括号里的 `（v1.0.0 当时的数字）` 是仓库里加的注解（14 个字符），线上正文没有它。2026-11-08 用 `api.github.com` 取 v1.0.0 正文比对过：块 2381 字符 / 线上 2367 字符，差异正好是这 14 个字符。
+> 新的版本号一律用 `tools\release.ps1` + `release-notes-v<版本>.md` 发，不再改这一节。
 
 ```markdown
 长会话越滚越贵。步数到上限时，这个插件在**这一轮答完之后**（绝不中途打断）自动开新会话、把一份本地拼出来的交接摘要投过去、归档旧会话，再把界面切到新会话。摘要不调用模型，是纯本地模板拼装——省下的是「手动总结 + 复制 + 新建会话 + 记住进度」这四步。
@@ -59,7 +60,7 @@
 
 ### 兼容性
 
-只在我本人环境验证过：DSH 桌面版 `0.2.1-rc.3`（Windows）+ Node `v24.18.0`，`npm test` → 23 pass / 0 fail。CI 在 ubuntu + windows × node 20/22/24 跑单测，但**不覆盖宿主行为**，其他环境请先小范围试用。
+只在我本人环境验证过：DSH 桌面版 `0.2.1-rc.3`（Windows）+ Node `v24.18.0`，`npm test` → 23 pass / 0 fail（v1.0.0 当时的数字）。CI 在 ubuntu + windows × node 20/22/24 跑单测，但**不覆盖宿主行为**，其他环境请先小范围试用。
 
 ### 注意
 
@@ -88,31 +89,37 @@
 
 ## 二、演示 GIF：录什么 + 怎么压
 
-### 录什么（30 秒，8 个镜头，别再长）
+### 录什么（仓库里现在这条：约 18 秒，6 个镜头）
 
-| 秒 | 画面 | 目的 |
+按顺序讲「先留 N 分钟 → 到点先切走再归档」这条链路（1.4.0 起），全程只在设置页里点：
+
+| 约秒 | 画面 | 目的 |
 | --- | --- | --- |
-| 0–3 | DSH 侧边栏，某个会话的步数已经很高 | 立住"长会话"这个场景 |
-| 3–6 | 设置 → 会话换新，`minSteps / cooldown / maxRotations` 一屏 | 证明"有保护闸，不会乱换" |
-| 6–9 | 打开 `dryRun` 开关 | 证明"可以先空跑" |
-| 9–14 | 正常对话两轮，跨过上一步数 | 真实触发过程 |
-| 14–18 | `debug.log` 里 `[dry-run] 只记日志不换` | 空跑命中的证据 |
-| 18–21 | 关掉 `dryRun` | 切到真跑 |
-| 21–27 | 再跨一次：轮末自动换新会话，界面切过去、旧会话进归档 | 核心卖点 |
-| 27–30 | 新会话第一条消息就是交接摘要（滚动露两行） | 证明"进度没丢" |
+| 0–3 | 打开设置 → 左栏「会话换新」，露默认步数上限与工作区名单，随后平滑滚到开关区 | 交代入口 |
+| 3–6 | 取消勾选「换新后自动跳到新会话」 | 引出下一项 |
+| 6–7.8 | 面板里冒出「归档到点时自动跳到新会话」且已勾上 | 1.4.0 的新开关 |
+| 7.8–11.9 | 「归档前先留」填 1，再滚到底部 | 保留窗口怎么开 |
+| 11.9–15.1 | 点「保存」，按钮旁出现「已保存」 | 保存即生效、不用重启 |
+| 15.1–17.9 | 停在「最近日志」，读到写入行 | 落盘证据 |
 
-录制要点：**1280×720 以上、只录窗口区域**、不要录到自己的 key/路径/其他会话标题、别用鼠标画圈（GIF 里会糊）。走路线 A 时这些都由脚本兜住（1200×900 定死、假工作区、假光标带点击涟漪）。
+输出是 800×800（在 1200×900 视口里裁 `200,50,800,800`），实测 **17.87 秒 / 227 帧 / 0.75 MB / 12.7 fps**。
+
+每个镜头的准确时间点记在 `docs\img\demo.timeline.json`（`shots[].frame` 与 `shots[].seconds`，秒数 = 帧号 ÷ 实测 fps），表里的秒数可以据此复算，不用去数 GIF。
+
+**脚本分镜与这条 GIF 完全对应**：`tools\record-cdp.cjs` 里就是上表这 6 个镜头（`window.__cap` 的六条文案一一对应），初态由 `resetConfig()` 写成 `deferArchiveMinutes: 1`，所以取消「换新后自动跳到新会话」时「归档到点时自动跳到新会话」会立刻冒出来（1.4.1 起该行的显示条件是 `autoSwitch || !(deferArchiveMinutes > 0)`，初态为 0 就不会出现）。每次点击前先 `scrollIntoView` 把目标滚进视口——面板比视口高，滚出视口的元素收不到 CDP 的鼠标事件，会静默不生效。
+
+录制要点：**只录窗口区域**、不要录到自己的 key/路径/其他会话标题、别用鼠标画圈（GIF 里会糊）。走路线 A 时这些都由脚本兜住（视口 1200×900 定死、假工作区名、假光标带点击涟漪、顶部字幕条）。
 
 素材里一定会出现的 7 类敏感区（发图前对着核一遍）：标题栏用户名、左侧会话标题列表、对话正文/思考块/模型名、底部状态栏的 token 数与缓存命中、设置页的工作区名单、「最近日志」里的 `C:\Users\<你>\.dsh\...` 与 session UUID、「打开配置文件」旁的路径。
 
 ### 路线 A：仓库自带录制脚本（推荐，全自动、不上屏）
 
-`tools\record-cdp.ps1` 起一个**独立的临时 DSH_HOME + 无头 Chrome**，用 CDP 截页面，不碰你的屏幕：屏幕上开着什么窗口都录不进去，演示用的工作区是脚本自己造的假名字（`demo-app` / `landing-page` / `sdk-samples`），画面里出现的路径也是 `C:\ProgramData\...`，没有用户名、没有你的仓库路径。
+`tools\record-cdp.ps1` 起一个**独立的临时 DSH_HOME + 无头 Chrome**，用 CDP 截页面，不碰你的屏幕：屏幕上开着什么窗口都录不进去，演示用的工作区是脚本自己造的假名字（`demo-app` / `landing-page` / `sdk-samples`），画面里出现的路径是临时 HOME 下的中性路径（脚本默认 `C:\ProgramData\dsh-rotate-demo-home\...`，仓库里这条 GIF 录的就是它），没有用户名、没有你的仓库路径。
 
 ```powershell
 cd 'D:\dsh-plugins\dsh-session-rotate'
 pwsh -NoProfile -File .\tools\record-cdp.ps1
-# 产出 docs\img\demo.gif（约 0.5 MB / 13 秒 / 170 帧左右）
+# 产出 docs\img\demo.gif 和 docs\img\demo.timeline.json（后者记 6 个镜头的帧号/秒数）
 ```
 
 - 需要：Node 22+（用内置 WebSocket，不用 `npm install`）、ffmpeg、Chrome 或 Edge、`dsh` 在 PATH 上。
@@ -136,6 +143,10 @@ pwsh -NoProfile -File .\tools\record-demo.ps1 -WindowTitle 'DeepSeek Harness' -S
 - ffmpeg 自动在 PATH 和 `D:\tools\ffmpeg\bin` 等处找；找不到用 `-Ffmpeg <路径>`。
 - 超 3 MB 会自动降到 10/8/6 fps 或 900/800/700 px 重压；仍超就 `-Seconds` 调短。
 - 想留原始帧复查：加 `-KeepFrames`（会打印帧目录，默认录完删掉）。
+
+### 路线 B2：带自动分镜的抓屏（`tools\record-storyboard.ps1`）
+
+同样 GDI 抓屏，但带 UIA 自动分镜（点头像 → 设置 → 会话换新 → 面板滚动 → Esc 关闭，默认 16 秒 / 10 fps），输出同样是 `docs\img\demo.gif`，`-NoActions` 只录不操作。它录的是真窗口，脱敏要求同路线 B。
 
 ### 路线 C：ScreenToGif（GUI，想手改帧时用）
 
@@ -162,15 +173,19 @@ $ff = 'D:\tools\ffmpeg\bin\ffmpeg.exe'
 
 ### 压完把 GIF 插进两份 README
 
-中文 `README.md` 的 `## 功能` 之前插一行：
+中文 `README.md` 的 `## 功能` 之前插一行（与仓库现在的一致）：
 
 ```markdown
-![步数到上限后自动换新会话，交接摘要随新会话带过去](docs/img/demo.gif)
+![设置 → 会话换新：取消「换新后自动跳到新会话」后多出「归档到点时自动跳到新会话」，填 1 分钟保留期，保存即生效](docs/img/demo.gif)
 ```
 
-英文 `README.en.md` 的 `## Features` 之前插同一行（路径相同）。
+英文 `README.en.md` 的 `## Features` 之前插同一行，图注写英文（路径相同）：
 
-插完各跑一次检查：`git status --short` 应看到 `docs/img/demo.gif` 是新增，两份 README 是修改。
+```markdown
+![Settings → 会话换新: turning off "switch to the new session" reveals "switch when the archive fires"; set a 1-minute grace window and save](docs/img/demo.gif)
+```
+
+插完各跑一次检查：`git status --short` 应看到 `docs/img/demo.gif` 被修改（它已经被跟踪了，但第一次插入时会是新增）、两份 README 是修改。
 
 ---
 

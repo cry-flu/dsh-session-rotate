@@ -87,6 +87,13 @@ function resetConfig() {
       cooldownMinutes: 10,
       maxRotations: 3,
       dryRun: false,
+      // 分镜需要一个可复现的初态：「归档前先留」已经是 1 分钟，
+      // 这样取消「换新后自动跳到新会话」时，「归档到点时自动跳到新会话」才会立刻冒出来
+      // （1.4.1 的显示条件是 autoSwitch || !(deferArchiveMinutes > 0)）。
+      archiveOnRotate: true,
+      autoSwitch: true,
+      switchOnArchive: true,
+      deferArchiveMinutes: 1,
     }, null, 2) + '\n',
     'utf8',
   )
@@ -118,9 +125,12 @@ async function main() {
     const leaf=cand.reduce((a,b)=>b.getBoundingClientRect().y>a.getBoundingClientRect().y?b:a);
     const ly=leaf.getBoundingClientRect().y;
     const sel=${kind === 'checkbox' ? `'input[type=checkbox]'` : `'input[type=text],input:not([type=checkbox])'`};
-    const items=[...document.querySelectorAll(sel)].filter(c=>{const r=c.getBoundingClientRect();return r.width>0&&r.height>0}).map(c=>{const r=c.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),top:r.y,checked:c.checked,val:c.value}});
+    const items=[...document.querySelectorAll(sel)].filter(c=>{const r=c.getBoundingClientRect();return r.width>0&&r.height>0}).map(c=>{const r=c.getBoundingClientRect();return {el:c,x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2),top:r.y,checked:c.checked,val:c.value}});
     if(!items.length) return null;
     const best=items.reduce((a,b)=>Math.abs(b.top-ly)<Math.abs(a.top-ly)?b:a);
+    /* 打个标记，外面的 scroll/点击可以按标记重新取一次坐标（面板下半部分可能在首屏之外） */
+    document.querySelectorAll('[data-gif]').forEach(e=>{delete e.dataset.gif});
+    best.el.dataset.gif='1';
     return {x:best.x,y:best.y,checked:best.checked,val:best.val};
   })()`
   const cbFor = (n) => nearInput(n, 'checkbox')
@@ -134,6 +144,36 @@ async function main() {
   }
   const clickOn = async (sel, moveMs = 600, holdAfter = 500) => {
     const r = await pointAt(sel, moveMs)
+    await cdp.click(r.x, r.y)
+    await ev(`window.__ring(${r.x},${r.y})`)
+    await sleep(holdAfter)
+    return r
+  }
+
+  /**
+   * 把 nearInput 刚标记的元素滚到视口中间，再取一次坐标。
+   * 设置面板比视口长，开关区在首屏之外：直接按首屏坐标点会打在视口外，React 收不到事件。
+   */
+  const scrollToMarked = async (smooth = true) => {
+    const probe = `(()=>{const el=document.querySelector('[data-gif="1"]');if(!el)return null;const b=el.getBoundingClientRect();return {x:Math.round(b.x+b.width/2),y:Math.round(b.y+b.height/2),checked:el.checked,val:el.value}})()`
+    const at = await ev(probe)
+    if (!at) return null
+    /* 已经在可视区中间就不要再滚：多余的 scrollIntoView 会让画面在点击前抖一下 */
+    if (at.y > 110 && at.y < 800) {
+      await sleep(250)
+      return at
+    }
+    await ev(`(()=>{const el=document.querySelector('[data-gif="1"]');if(el)el.scrollIntoView({block:'center',behavior:'${smooth ? 'smooth' : 'instant'}'});return el?'ok':'no'})()`)
+    await sleep(smooth ? 1000 : 400)
+    return ev(probe)
+  }
+  const clickEl = async (expr, moveMs = 600, holdAfter = 500) => {
+    const found = await ev(expr)
+    if (!found) throw new Error('element not found: ' + expr.slice(0, 60))
+    const r = await scrollToMarked(true)
+    if (!r) throw new Error('标记元素已丢失: ' + expr.slice(0, 60))
+    if (r.y < 60 || r.y > 880) console.log(`warn: target y=${r.y} 可能不在可视区`)
+    await pointAt(`({x:${r.x},y:${r.y}})`, moveMs)
     await cdp.click(r.x, r.y)
     await ev(`window.__ring(${r.x},${r.y})`)
     await sleep(holdAfter)
@@ -174,7 +214,6 @@ async function main() {
   await sleep(600)
 
   await ev(OVERLAY)
-  await ev(`window.__cap('① 设置 → 会话换新')`)
 
   // ---- 开录 ----
   fs.rmSync(FRAMES, { recursive: true, force: true })
@@ -182,6 +221,12 @@ async function main() {
   let recording = true
   let n = 0
   const t0 = Date.now()
+  /** 字幕挂上的帧号与秒数，最后写进 demo.timeline.json —— 文档里的秒数由此复算 */
+  const caps = []
+  const cap = async (text) => {
+    caps.push({ frame: n, at: +((Date.now() - t0) / 1000).toFixed(2), text })
+    await ev(`window.__cap(${JSON.stringify(text)})`)
+  }
   const loop = (async () => {
     while (recording) {
       const target = t0 + n * (1000 / FPS)
@@ -193,36 +238,60 @@ async function main() {
     }
   })()
 
-  await sleep(600)
-  // 1) 勾 landing-page
-  await ev(`window.__cap('② 勾选要自动换新的工作区')`)
+  // 首帧先稳住：顶部（默认步数上限 + 工作区名单）
+  await cap('① 设置 → 会话换新')
+  await sleep(1600)
+
+  // 开关区在首屏之外：先平滑滚过去（这段滚动本身也在画面里）
+  await ev(`(()=>{const o=${cbFor('换新后自动跳到新会话')};if(!o)return null;const el=document.querySelector('[data-gif="1"]');if(el)el.scrollIntoView({block:'center',behavior:'smooth'});return 'ok'})()`)
+  await sleep(1200)
+
+  // 1) 取消「换新后自动跳到新会话」
+  await cap('② 取消「换新后自动跳到新会话」')
   await sleep(500)
-  await clickOn(cbFor('landing-page'), 650, 500)
+  const autoSwitch = await ev(cbFor('换新后自动跳到新会话'))
+  if (!autoSwitch) throw new Error('找不到「换新后自动跳到新会话」勾选框（界面文案变了？）')
+  console.log('autoSwitch before:', JSON.stringify(autoSwitch), '| defer:', JSON.stringify(await ev(inputFor('归档前先留（分钟）'))))
+  if (autoSwitch.checked) await clickEl(cbFor('换新后自动跳到新会话'), 650, 500)
+  await sleep(600)
+
+  // 2) 面板这时才多出「归档到点时自动跳到新会话」
+  await cap('③ 于是多出「归档到点时自动跳到新会话」')
+  await sleep(900)
+  const switchOnArchive = await ev(cbFor('归档到点时自动跳到新会话'))
+  if (!switchOnArchive) throw new Error('取消 autoSwitch 后没出现「归档到点时自动跳到新会话」：初态 deferArchiveMinutes 必须 > 0（见 resetConfig）')
+  if (!switchOnArchive.checked) await clickEl(cbFor('归档到点时自动跳到新会话'), 600, 400)
   await sleep(700)
 
-  // 2) 填自己的上限 30
-  await ev(`window.__cap('③ 单个工作区可以单独设上限，留空就跟默认')`)
+  // 3) 「归档前先留」填 1 分钟
+  await cap('④ 「归档前先留」填 1 分钟')
   await sleep(450)
-  await clickOn(inputFor('landing-page'), 550, 200)
+  await clickEl(inputFor('归档前先留（分钟）'), 550, 200)
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', modifiers: 2, key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65 })
   await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', modifiers: 2, key: 'a', code: 'KeyA', windowsVirtualKeyCode: 65 })
   await sleep(150)
-  await cdp.send('Input.insertText', { text: '30' })
-  await sleep(650)
-
-  // 3) 再勾 sdk-samples
-  await clickOn(cbFor('sdk-samples'), 550, 400)
-  await ev(`window.__cap('④ 保存即生效，不用重启')`)
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8 })
+  await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8 })
+  await sleep(300)
+  await cdp.send('Input.insertText', { text: '1' })
   await sleep(700)
 
   // 4) 平滑滚到底部（保存按钮 + 最近日志）
   await ev(`new Promise(r=>{const sc=${SCROLL_SEL};if(!sc){r(0);return}const to=sc.scrollHeight-sc.clientHeight,from=sc.scrollTop,t=performance.now(),dur=1000;
     (function step(){const p=Math.min(1,(performance.now()-t)/dur),e=1-Math.pow(1-p,3);sc.scrollTop=from+(to-from)*e;p<1?requestAnimationFrame(step):r(1)})()})`)
   await sleep(700)
+  await cap('⑤ 保存即生效，不用重启')
+  await sleep(400)
 
-  // 5) 保存
+  // 5) 保存，确认出现「已保存」
   await clickOn(`(()=>{const b=[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='保存');if(!b)return null;const r=b.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()`, 550, 900)
-  await ev(`window.__cap('⑤ 最近日志确认写入')`)
+  await sleep(600)
+  const savedHit = await ev(`(()=>[...document.querySelectorAll('*')].some(e=>e.children.length===0&&(e.textContent||'').trim()==='已保存')?'已保存':'')()`)
+  console.log('save note:', savedHit || '(画面里没读到「已保存」，检查保存是否成功)')
+
+  // 6) 最近日志确认写入
+  await sleep(500)
+  await cap('⑥ 最近日志确认写入')
   await sleep(2400)
 
   recording = false
@@ -241,6 +310,19 @@ async function main() {
     '-lavfi', `${vf}[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle`, '-loop', '0', OUT])
   const mb = fs.statSync(OUT).size / 1024 / 1024
   console.log(`gif: ${OUT} (${mb.toFixed(2)} MB, ${total} 帧, ${(total / realFps).toFixed(1)}s)`)
+
+  const timeline = {
+    gif: path.basename(OUT),
+    width: CLIP.width,
+    height: CLIP.height,
+    frames: total,
+    fps: realFps,
+    seconds: +(total / realFps).toFixed(2),
+    shots: caps.map((c) => ({ ...c, seconds: +(c.frame / realFps).toFixed(2) })),
+  }
+  const tlFile = path.join(path.dirname(OUT), 'demo.timeline.json')
+  fs.writeFileSync(tlFile, JSON.stringify(timeline, null, 2) + '\n', 'utf8')
+  console.log('timeline:', tlFile)
 
   if (!KEEP) fs.rmSync(FRAMES, { recursive: true, force: true })
   else console.log('frames kept:', FRAMES)

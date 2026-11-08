@@ -20,7 +20,7 @@ Long sessions get more expensive with every turn. When a session reaches its ste
 | Capability | What it does |
 | --- | --- |
 | Per-workspace limits | One `maxSteps` per workspace; leave it empty to inherit the global default — and keep inheriting when the default changes |
-| Templated handoff summary | Fixed template: a head of at most 16 lines (latest user message plus earlier instructions), then **the full text of the last assistant reply** (up to 4000 chars, head and tail kept beyond that). **No extra model call.** |
+| Templated handoff summary | Fixed template: a head of at most 16 lines (latest user message plus earlier instructions), then **the full text of the last assistant reply** (up to 4000 chars, head and tail kept beyond that). **No extra model call.** The summary is delivered once, as the first user message of the new session; after that it rides along as context on every request (cache hits keep it cheap) |
 | Turn-boundary prediction | Estimates the next turn from the mean of the last 3 turn deltas and rotates at the boundary instead of waiting to blow past the limit |
 | Protection gates | `minSteps` hard floor, `cooldownMinutes` cooldown, `maxRotations` consecutive rotations before a workspace is paused |
 | Dry run | `dryRun` only writes a log line: no session is created, nothing is archived, the UI does not jump |
@@ -85,6 +85,24 @@ Config lives in `~/.dsh/session-rotate/config.json`; the settings page edits the
 
 An empty `maxSteps` follows the default and keeps following it; a positive integer pins that workspace to its own number. The workspace name must match the sidebar name **exactly** — a mismatch is skipped silently, so check `debug.log` to see what actually matched.
 
+## Common combinations
+
+Four switches get confusing fast; look up the effect you want instead. Defaults are in **bold**:
+
+| What you want | `autoSwitch` | `archiveOnRotate` | `deferArchiveMinutes` | `switchOnArchive` |
+| --- | --- | --- | --- | --- |
+| Default: rotate, jump to the new session, archive the old one at once (same as 1.0.0) | **`true`** | **`true`** | **`0`** | no effect |
+| Keep the old session in the sidebar and clean it up yourself | **`true`** | `false` | any | no effect |
+| Do not jump, but archive the old session after N minutes (the UI is moved to the new session first) | `false` | **`true`** | `N` (>0) | **`true`** |
+| Never touch the old session (no jump either) | `false` | any | `0`, or `switchOnArchive=false` | `false` |
+
+Where a setting stops mattering:
+
+- `switchOnArchive` only means something when `autoSwitch=false` **and** `deferArchiveMinutes>0`; with `autoSwitch=true` it is ignored (the panel hides it).
+- With `autoSwitch=false`, `deferArchiveMinutes=0` or `switchOnArchive=false` makes `archiveOnRotate` moot — the old session is always kept, because you are still looking at it.
+- With `archiveOnRotate=false`, `deferArchiveMinutes` is moot: there is nothing to archive, so there is no deadline.
+- The whole policy is `archivePlan` (`lib/index.js:184-196`); the four rows above are its complete behaviour, there are no hidden branches.
+
 ## Test it with the dry run
 
 To find out whether "it will fire when the limit is reached", use the dry run instead of lowering your real limit:
@@ -112,10 +130,46 @@ rm -rf ~/.dsh/session-rotate      # optional: logs, pause state and delta histor
 - **The limit is soft.** Decisions happen between turns, never mid-turn, so the actual rotation point floats around `maxSteps`: with prediction on it usually lands slightly below, with prediction off it often lands well above (a single turn can burn twenty-odd steps).
 - **The first turn of a new session is a real request.** The handoff summary is sent as the first user message; the summary itself is free, but that turn is billed like any other and costs a few tokens.
 - Only top-level sessions are covered, sub-sessions are skipped; each session fires at most once; a paused workspace is resumed with `POST /dsh-session-rotate/config` and `{"clearPause": true}`, or by deleting `~/.dsh/session-rotate/state.json` and restarting the plugin.
+- **The deferred archive moves the UI first.** On the "no jump + clean up after N minutes" path, `switchOnArchive` moves the UI to the new session at the deadline, and the old session is archived `SWITCH_LEAD_MS` (3 s, `lib/index.js:160`) later. If you are typing in the old session at that moment, the input box goes with the session switch — unsent text does not come along.
+- **Deferred archives queued under 1.2.0 are never completed after an upgrade.** Archiving has to pass `canTouchOwn` (`lib/index.js:961`), and the `ownSessions` list only exists since 1.3.0: sessions rotated out by 1.2.0 were never recorded there, so after an upgrade the deadline only writes a `skipped: not rotated out by this plugin` line and drops that pending entry instead of retrying. Clean those sessions up by hand.
+- **The handoff summary is a startup cost for the new session.** The previous reply (up to 4000 chars) is sent as the new session's first user message and then rides along as context on every request; cache hits keep it cheap, but the new session really does start with a bigger context than an empty one.
+
+## Measured reference
+
+Platform exports from 2026-11-08 (`usage_data_*.zip`, one `amount` and one `cost` CSV each), aggregated per day. The raw files are not committed (`usage-raw/` is gitignored), but **the 10-31 and 11-07 rows can be recomputed**: `tools/usage-summary.ps1` reads the zip (or an extracted folder) and uses the same definitions as the table below.
+
+```powershell
+pwsh -File tools\usage-summary.ps1 -Path E:\download\usage_data_2026-11-07_2026-11-07.zip
+# | 2026-11-07 | 1,418 | 85,801,186 | 98.2% | 6.3266 | 60,509 | 0.446 |
+```
+
+Definitions: requests = sum of `request_count`; total tokens = `input_cache_hit_tokens` + `input_cache_miss_tokens` + `output_tokens`; cache hit rate = hit ÷ (hit + miss); cost = sum of the `cost` column (CNY); the last two columns are derived. Only these per-day figures are used:
+
+| Date | Requests | Total tokens (input + output) | Cache hit rate | Cost (CNY) | Tokens per request | Cost per 100 requests (CNY) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-31 | 1,565 | 218,093,582 | 97.3% | 14.6912 | 139,357 | 0.939 |
+| 2026-11-03 | 273 | 38,111,601 | 96.4% | 2.9166 | 139,603 | 1.068 |
+| 2026-11-07 | 1,418 | 85,801,186 | 98.2% | 6.3266 | 60,509 | 0.446 |
+
+The 10-31 and 11-07 rows were each recomputed from the original export with `tools/usage-summary.ps1` and match digit for digit (10-31: 68 amount rows over 17 hourly buckets; 11-07: 64 rows over 16). The 11-03 export was not kept, so **that row has no verifiable input** — it is only the summary recorded at the time.
+
+One line: tokens per request drop from 139,357 (10-31) to 60,509 (11-07), about -57%; but the request volume differs by an order of magnitude (1,565 / 273 / 1,418) and 11-07 still ran 1.1.x — these are **observed figures**, not a causal "the plugin saved this much" claim.
+
+Five caveats before reading the table:
+
+1. Single user, single environment (Windows desktop + `deepseek-flash`); the three days differ in workload (1,565 / 273 / 1,418 requests), so **days with different volume are not directly comparable**.
+2. Other changes landed in the same period: auto-reply turned off, long sessions archived, token-saving rules added. The drop cannot be attributed to this plugin alone.
+3. 11-03 is not a "before the plugin" day: the earliest `loaded` line in the local `debug.log` is `2026-11-03T16:03:47Z`, and that afternoon already had one real rotation. The only true "before" day here is 10-31.
+4. On 11-07 the plugin was at 0.2.1–1.0.0 (`CHANGELOG` dates 1.1.0 to 2026-11-08), not 1.4.1; neither the deferred archive of 1.2.0 nor the switch options of 1.3.x are reflected in these numbers.
+5. The 11-03 CSV also contains 4 `function_call` counts; that is not a token type and is excluded from the table.
+
+**To be filled** (no data, no estimates): the full 11-08 day (exportable only after the day ends) and the average context size of sessions before/after a rotation (the exports have no session dimension).
+
+Direct evidence that the plugin runs (local `debug.log`, as of `2026-11-08T03:20Z`): 43 rotations in total (11-03: 1, 11-04: 3, 11-06: 12, 11-07: 24, 11-08: 3), of which 7 were kept for review first and 5 reached the deferred archive. This proves activity, not savings.
 
 ## Testing status
 
-Only tested in my own environment — **no** cross-platform or cross-version verification: DSH Desktop `0.2.1-rc.3` (Windows) + Node `v24.18.0`, `npm test` → 23 pass / 0 fail (`node --test`). CI (`.github/workflows/test.yml`) runs the unit tests on ubuntu + windows × node 20/22/24, but that covers unit tests only, not host behaviour.
+Only tested in my own environment — **no** cross-platform or cross-version verification: DSH Desktop `0.2.1-rc.3` (Windows) + Node `v24.18.0`, `npm test` → 46 pass / 0 fail (`node --test`). CI (`.github/workflows/test.yml`) runs the unit tests on ubuntu + windows × node 20/22/24, but that covers unit tests only, not host behaviour.
 
 ## Disclaimer
 
