@@ -49,6 +49,8 @@
 
 已发出的 tag 与 Release **不删除、不移动、不重写历史**。有问题就发新的补丁版本。
 
+例外只在维护者明确说「就改这个版本」时开一次（2026-11-08 重打包 `v1.4.1` 即此情形，原话：「直接改吧，目前0个人除了我在用这个插件」）。改之前把代价写清（谁会被影响、版本号不变意味着什么），改完把新旧 commit / tag object / 附件 digest 一起列出来对账。
+
 ### 1.7 发版后要列清单
 
 每次发版后，把「已发布的版本、tag、Release 链接」列出来给维护者核对。
@@ -68,5 +70,11 @@ npm 上已有同名包（或版本号被占用）时，**不要自己改名发�
 
 ## 3. 未提交 / 未发布的留痕
 
-- `v1.4.1` 之后的本地提交：`3d3d29e docs: 演示 GIF 重录为 6 镜头；实测参考表补可复算脚本`（未 push）
+**`v1.4.1` 已重打包上线（2026-11-08 12:24），工作树干净、main 与 origin/main 齐平。**
+
+- main `d2dcaf1`，收进三个提交：`d2dcaf1` README 提醒、`4472e8f` 发版规矩文档、`3d3d29e` GIF 重录
+- tag `v1.4.1` 由 `a628022`（指向 `2330bfc`）强移到 `d2dcaf1`；远端 annotated tag object 现为 `5e51865`
+- Release `v1.4.1`（id 437983166）正文已换成带「本次重打包补入」的版本；附件换新：`dsh-session-rotate-1.4.1.tgz` 45819 B，`sha256:6fcd34fe3a2812d8010a01a88ac588bd4062fed2556022ec6a81b24644578684`（旧附件 40411 B 已删）
+- 本机出网踩坑：`C:\Windows\System32\drivers\etc\hosts:30` 早先被钉成 `20.27.177.113 github.com`，该 IP 443 超时（`api.github.com`/`codeload`/`ssh` 反而通），git push 报 `Connection was reset`。改成 `140.82.113.3 github.com` 后直连恢复 200；原文件备份在 `hosts.bak-20261108`
+- 包内容确认：`files` 字段只收 `lib/ cordis.patch.yml README.md README.en.md CHANGELOG.md LICENSE`，**tgz 里从来没有 `docs/`**，所以「Release 附件与仓库 GIF 不一致」这个说法不成立 —— 图只存在于仓库与 GitHub Pages
 - 待办：真换新三场景实测（要改真 HOME 的 `config.json`，跑起来会真换会话，需维护者点头）
