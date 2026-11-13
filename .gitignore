@@ -36,3 +36,6 @@ usage-raw/
 
 # 发版临时工作树
 .tmp-release/
+
+# 发版说明草稿（发布内容走 Release，草稿不入库）
+release-notes-*.md
