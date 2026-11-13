@@ -5,7 +5,7 @@
 
 ## 0. 现状一句话
 
-插件已发布到 `https://github.com/cry-flu/dsh-session-rotate`，当前正式版 `v1.4.2`（2026-11-08）。本机 `main` 与 `origin/main` 齐平。
+插件已发布到 `https://github.com/cry-flu/dsh-session-rotate`，当前正式版 `v1.5.0`（2026-11-13）。本机 `main` 与 `origin/main` 齐平。
 
 ## 1. 发版与版本号（硬规矩）
 
@@ -90,3 +90,13 @@ npm 上已有同名包（或版本号被占用）时，**不要自己改名发�
 - **发版留痕（2026-11-08）**：main `39e3323`，tag `v1.4.2`（annotated object `e8dc10a` → commit `39e3323`），Release id `438099587`，<https://github.com/cry-flu/dsh-session-rotate/releases/tag/v1.4.2>。附件 `dsh-session-rotate-1.4.2.tgz` 47307 B，`sha256:6b5a2e04935adb8bf84f741abdd396cbfefdc9a6f83656d71af2c6f600cfe39c`（GitHub 侧 digest 与本地一致）。CI 9 项 check 全 success（test × 6 平台组合 + build + deploy）。
 - 同日 `v1.4.1`（12:23）之后 3 小时再发 1.4.2，属维护者当场批准的 1.4 例外（原话：「破例，今天就发 1.4.2」）。
 - 起发版流程前先看第 1 节：push / tag / Release / npm 发布都要维护者回「执行」。
+
+## 5. 1.5.0 已发版（2026-11-13）
+
+**发版提交**：`62bb78b`（`feat: 交接摘要改为状态摘要、轮前预算提醒、会话标题编号（1.5.0）`），其后一个文档提交 `5e9d9ba`（`chore: .gitignore 忽略发版说明草稿 release-notes-*.md`）。工作树干净，本机 `main` = `origin/main` = `5e9d9ba1a1dd3100d260ae22494bcffa981f8f68`。
+
+- **发版留痕（2026-11-13）**：main `5e9d9ba`，tag `v1.5.0`（annotated object `46a7c8ff56749a118139a622e21dca4ac23c1274` → commit `62bb78b843120ac1d60ad193d99be2fdc3940f56`），Release id `443860576`（draft=False、prerelease=False，2026-11-13 05:42 UTC 发布），<https://github.com/cry-flu/dsh-session-rotate/releases/tag/v1.5.0>。附件 `dsh-session-rotate-1.5.0.tgz` 56134 B，`sha256:a47051b41b55ca5a7f884b0a5b1868af7aa507c0a94c48715e49f09d7eb46863`（**只能以 GitHub 侧 digest 为准**：本地 tgz 已随临时目录清掉，没留副本）。CI：`62bb78b` 上 test、pages build and deployment 均 success，之后的 `5e9d9ba` 同样 success。
+- **远端三方逐位一致已核**：`refs/tags/v1.5.0` = `46a7c8ff…`，API 解引用到 `62bb78b…`（不是 main HEAD，没踩「Release 先建、tag 被指到 main」的老坑）；`refs/heads/main` = `5e9d9ba…`。
+- **推送通道**：`github.com:443` 整段不通，走 Git Data API 推 blob/tree/commit + 手建 annotated tag（`work area\_release-150\push-api.mjs`），附件走 `uploads.github.com`（`work area\_release-150\release.mjs`）。SHA 与本地逐位一致，故本地无需 fetch 即可判断齐平。
+- **本次改动要点**：删掉「上一会话最后的回复（全文）」（`REPLY_CUT`/`clipReply` 整个删除），摘要改由 `touchedFiles` / `ranCommands` / `pendingLines` 现抽状态，`HEAD_LINES` 16 → 14；新增轮前预算提醒（`agent.ctx.inject(['systemPrompt'], …)` 挂动态 section，`>=80%` 软、`>=100%` 硬）；同工作区多会话时标题加 `[#N]` 前缀、换新标「收尾 / 接续」；未在名单里的工作区不再静默。
+- `npm test` 57 pass（`config.test.mjs` 里 `clipReply` 的用例已随函数一起删）。
