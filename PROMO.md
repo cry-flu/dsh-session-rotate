@@ -9,7 +9,7 @@
 
 > 线上正文就是下面代码块里这段（https://github.com/cry-flu/dsh-session-rotate/releases/tag/v1.0.0 ），它是 v1.0.0 当时的快照，别拿现在的数字回填历史版本：其中 `npm test` 写的是当时的 23 pass，仓库现在跑出来是 46 pass。
 > 一字不差的例外只有一处：代码块里 `npm test → 23 pass / 0 fail` 那句末尾括号里的 `（v1.0.0 当时的数字）` 是仓库里加的注解（14 个字符），线上正文没有它。2026-11-08 用 `api.github.com` 取 v1.0.0 正文比对过：块 2381 字符 / 线上 2367 字符，差异正好是这 14 个字符。
-> 新的版本号一律用 `tools\release.ps1` + `release-notes-v<版本>.md` 发，不再改这一节。
+> 新的版本号一律用 `tools\release.ps1` + `release-notes-v<版本>.md` 发，不再改这一节。1.4.x 的正文底稿在仓库根目录 `release-notes-v1.4.2.md`（1.4.1 是 `release-notes-v1.4.1.md`），发版时从那儿取，别在 PROMO 里再攒一份。
 
 ```markdown
 长会话越滚越贵。步数到上限时，这个插件在**这一轮答完之后**（绝不中途打断）自动开新会话、把一份本地拼出来的交接摘要投过去、归档旧会话，再把界面切到新会话。摘要不调用模型，是纯本地模板拼装——省下的是「手动总结 + 复制 + 新建会话 + 记住进度」这四步。
@@ -91,7 +91,7 @@
 
 ### 录什么（仓库里现在这条：约 18 秒，6 个镜头）
 
-按顺序讲「先留 N 分钟 → 到点先切走再归档」这条链路（1.4.0 起），全程只在设置页里点：
+按顺序讲「先留 N 分钟 → 到点切走再归档；旧会话还有活就顺延、顺延用尽就放弃归档」这条链路（1.4.0 起；1.4.2 起到点归档不再掐断进行中的轮），全程只在设置页里点：
 
 | 约秒 | 画面 | 目的 |
 | --- | --- | --- |
@@ -105,6 +105,14 @@
 输出是 800×800（在 1200×900 视口里裁 `200,50,800,800`），实测 **17.87 秒 / 227 帧 / 0.75 MB / 12.7 fps**。
 
 每个镜头的准确时间点记在 `docs\img\demo.timeline.json`（`shots[].frame` 与 `shots[].seconds`，秒数 = 帧号 ÷ 实测 fps），表里的秒数可以据此复算，不用去数 GIF。
+
+### 日志证据图：`docs\img\deferral-log.png`（1240×260，61 KB）
+
+比录视频便宜的第二件素材：把 `~/.dsh/session-rotate/debug.log` 里真实的三行贴成一张终端样式的图，证明「装上了 → 保留期生效 → 到点归档」这条链路。仓库里那张取自 2026-11-08 本机日志，**会话 id 打码成 `<old>` / `<new>`，其余一字未改**；图注写明是原文、打码范围。
+
+它**不证明**顺延——顺延要在保留期内让旧会话一直有活才会出现（那三场景还没跑，见 `NOTES-session-rotate-推广.md` §4）。所以配文只能写「保留期与到点归档」，别写成「顺延也验过了」。
+
+重生成：`python "D:\deepseek harness\work area\_promo\make-log-card.py"`（要 Pillow + 微软雅黑；改文案直接改脚本里的 `LINES`）。
 
 **脚本分镜与这条 GIF 完全对应**：`tools\record-cdp.cjs` 里就是上表这 6 个镜头（`window.__cap` 的六条文案一一对应），初态由 `resetConfig()` 写成 `deferArchiveMinutes: 1`，所以取消「换新后自动跳到新会话」时「归档到点时自动跳到新会话」会立刻冒出来（1.4.1 起该行的显示条件是 `autoSwitch || !(deferArchiveMinutes > 0)`，初态为 0 就不会出现）。每次点击前先 `scrollIntoView` 把目标滚进视口——面板比视口高，滚出视口的元素收不到 CDP 的鼠标事件，会静默不生效。
 
@@ -193,24 +201,76 @@ $ff = '<ffmpeg.exe 路径>'
 
 ## 三、发帖短文案（一次一句，别改写成长文）
 
+**一句话卖点（所有渠道共用这一句）**
+
+> 长会话越聊越贵的解法不是压缩上下文，是换新 + 交接。
+
 **群里转发（一句 + 链接）**
 
-> 分享个自己写的 DSH 插件：会话步数到上限自动换新会话，交接摘要本地拼、不调模型。只在轮末换、不打断，有 dryRun 可以先空跑验证。装的时候注意要**整个 DSH 换进程重启**（重开窗口不算）。https://github.com/cry-flu/dsh-session-rotate
+> 分享个自己写的 DSH 插件：会话步数到上限时在轮末自动换新，交接摘要本地拼、不调模型。换出来的旧会话先在侧边栏留 N 分钟，能回看最后一条回复再归档；到点归档撞上还在跑的轮会顺延，不会掐断。装的时候注意要**整个 DSH 换进程重启**（重开窗口不算）。https://github.com/cry-flu/dsh-session-rotate
 
 **X / 推**
 
-> Built a plugin for DeepSeek Harness: when a session hits its step limit, it rotates at the turn boundary, hands over a locally-templated summary (zero model calls), archives the old session and switches the UI. Dry-run mode first. MIT. https://github.com/cry-flu/dsh-session-rotate
+> Built a plugin for DeepSeek Harness: when a session hits its step limit, it rotates at the turn boundary — the summary handed over is a local template (zero model calls). The old session stays in the sidebar for a few more minutes so you can re-read its last reply before it is archived, and the scheduled archive is deferred (never forced) while that session is still busy. Dry-run mode first. MIT. https://github.com/cry-flu/dsh-session-rotate
 
 **V2EX 标题候选**
 
 - `做了个 DSH 插件：长会话到上限自动换新，交接摘要不花 token`
 - `长会话越聊越贵，我写了个插件在轮末自动换新会话`
+- `长会话到上限自动换新，旧会话还能回看几分钟再归档`
 
 **正文骨架（正文只说这六段，别加第七段）**
 
 1. 痛点：一个会话滚到几十步，每轮都在为历史付费（讲自己的账，不编数字）。
-2. 解法：轮末换新 + 本地拼摘要 + 保护闸防连环换。
+2. 解法：轮末换新 + 本地拼摘要 + 保护闸防连环换；1.2 之后旧会话先留 N 分钟可回看；1.4.2 之后到点归档撞上在跑的轮会顺延、不掐断。
 3. 怎么装：四步，**标注"必须换进程重启"**。
 4. 怎么先验证：`dryRun` 步骤，四行。
 5. 已知限制：软上限、只对顶层会话生效、只在自己环境测过。
 6. 求什么：**求 issue，不求 star** —— 最想知道"你环境里能不能正常触发"。
+
+**V2EX 正文（可直接贴，六段都在里面）**
+
+```markdown
+## 痛点
+
+一个会话滚到几十步之后，每一轮都在为前面几十步的历史付费。
+我自己的量：10-31 平均每次请求 13.9 万 token（139,357），11-07 掉到 6.05 万（60,509）。
+但这三天请求量差着一个数量级（1565 / 273 / 1418），同期还停过自动回复、归档过长会话——
+所以这组数是「观察到的现象」，不是「插件省了多少」的因果结论。
+
+## 解法
+
+步数到上限时，在**这一轮答完之后**开新会话（绝不中途打断），把一份本地模板拼的交接摘要
+投过去，归档旧会话，再切界面。摘要不调模型——省的是「手动总结 + 复制 + 新建会话 + 记住进度」这四步。
+
+- 1.2 之后：旧会话先在侧边栏留 N 分钟，能回看最后一条回复再归档。
+- 1.4.2 之后：到点归档撞上还在跑的轮，顺延 1 分钟重查、最多 10 次；用尽就放弃归档、
+  会话原样留着——任何情况下都不掐断进行中的轮。
+
+## 怎么装（四步，第四步是坑）
+
+1. profile 的 package.json 里登记 `dependencies` 与 `dsh.profile.bundles`；
+2. node_modules 里要有这个包（包管理器 install，或 `mklink /J`）；
+3. profile 的 cordis.patch.yml 末尾 `- insert` 挂载，写 `defaultMaxSteps` 与 `workspaces`；
+4. **整个 DSH 换进程重启**。重开窗口不算，重启后 Web GUI 端口会变。
+
+注意：不在 npm 上，npm 上的同名包是别人的。
+
+## 先空跑验证
+
+打开 `dryRun`，正常干活跨过 `maxSteps`，然后看 `~/.dsh/session-rotate/debug.log`，
+应该出现 `[dry-run] 只记日志不换`。别把 `maxSteps` 调成 2、3 去真测——一晚上能刷出一屏空会话。
+
+## 已知限制（先说清楚）
+
+- 上限是软上限，换新点在 `maxSteps` 附近浮动；
+- 新会话第一轮 `prevSteps` 未定义，不做预判，会盲跑到越限（实测 12/6）；
+- 只对顶层会话生效，子会话跳过；每个会话只触发一次；
+- 我只在自己环境验证过：Windows 桌面版 + Node 24。CI 只跑单测，不覆盖宿主行为。
+
+## 我想要什么
+
+不要 star，想要 issue。最想知道的是「你的环境里到底能不能正常触发」。
+```
+
+**这四句不许说**（`docs/usage-data.md` 的五条限制挡着）：省了 57% token、压缩了上下文、免费、比 XX 好用。数字可以说，但必须跟「同期还改了别的，这是观察不是因果」写在同一段。

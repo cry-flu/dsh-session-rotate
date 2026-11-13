@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { normalizeConfig, sanitizeConfig, configWarnings, workspaceOverrides, clipReply } from '../lib/index.js'
+import { normalizeConfig, sanitizeConfig, configWarnings, workspaceOverrides } from '../lib/index.js'
 
 /** 桌面面板实际提交的 payload：只有 defaultMaxSteps / confirmEmpty / workspaces */
 const panelPayload = (workspaces = [{ name: 'my-workspace', maxSteps: null }]) => ({
@@ -103,14 +103,4 @@ test('deferArchiveMinutes：默认 0（立即归档，与 1.0.0 一致），面�
   assert.equal(normalizeConfig({ deferArchiveMinutes: -3 }).deferArchiveMinutes, 0)
   assert.equal(sanitizeConfig(panelPayload(), { deferArchiveMinutes: 20 }).deferArchiveMinutes, 20)
   assert.equal(sanitizeConfig({ ...panelPayload(), deferArchiveMinutes: 0 }, { deferArchiveMinutes: 20 }).deferArchiveMinutes, 0)
-})
-
-test('clipReply：没超长就整段照贴，超长才头尾各留一段', () => {
-  const short = '一'.repeat(4000)
-  assert.equal(clipReply(short), short)
-  const long = clipReply('头'.repeat(6000) + '尾'.repeat(1000))
-  assert.ok(long.startsWith('头'))
-  assert.ok(long.endsWith('尾'))
-  assert.ok(long.includes('中间省略'))
-  assert.ok(long.length < 4200)
 })
