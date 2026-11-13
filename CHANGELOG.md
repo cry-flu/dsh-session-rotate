@@ -14,6 +14,7 @@
 
 ### 变更
 
+- **装完即挂载。** 包内 `cordis.patch.yml` 从空数组改成真正的 `- insert:` 块（这就是 `package.json` 里 `dsh.bundle.patch` 指向的那一层），默认 `defaultMaxSteps: 40` / `workspaces: []` / `dryRun: true` —— 名单为空 + 空跑，装完不会自己在任何工作区开换新。`dsh plugin add` 后设置页直接出现「会话换新」，不用再手改 profile 的 `cordis.patch.yml`。老 profile 里手写过的同 id `insert` 要改成纯 `- id: …` + `config:` 的覆盖形式，否则同 id 两条 insert 加载时报重复。README 中英与卸载说明同步（1.5.0 及更早的包仍是空 bundle patch，老办法照旧）。
 - 首轮被这道闸拦下时，代价是那一轮会盲跑到 `steps >= limit` 才换，第二轮起恢复正常预判；日志里写明原因，不静默。
 - 试运行（`dryRun`）下同一分支也记一条：`[dry-run] …（首轮无基线，不换：dry-run 同样不换，等下一轮有增量均值再判）`。
 - `steps < minSteps` 时归因仍给 `minSteps`（`未达最小步数`），不会被说成「首轮无基线」。
