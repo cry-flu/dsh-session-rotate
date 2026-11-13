@@ -47,20 +47,25 @@ Long sessions get more expensive with every turn. When a session reaches its ste
 cmd /c mklink /J "<profile>\node_modules\dsh-session-rotate" "<absolute plugin path>"
 ```
 
-**3. Mount and configure it at the end of the profile's `cordis.patch.yml`**
+**3. Mounting is already handled by the `cordis.patch.yml` shipped inside the package — you don't write it yourself.**
+
+The package declares `dsh.bundle.patch`, so as soon as its name appears in the profile's `dsh.profile.bundles` (step 1) it is inserted into the config tree at boot and the "Session Rotate" page shows up in Settings. The shipped defaults are deliberately conservative: `workspaces: []` (active nowhere) plus `dryRun: true` (logs only, no actual rotation).
+
+To turn it on, fill in your workspace name and untick "dry run" on that settings page; or override the defaults in your own profile's `cordis.patch.yml` (**do not add `insert` again** — two inserts with the same id fail at load time):
 
 ```yaml
-- insert:
-    - id: dsh-session-rotate
-      name: dsh-session-rotate
-      config:
-        defaultMaxSteps: 40
-        workspaces:
-          - name: my-workspace      # must match the sidebar name exactly (spaces and case included)
-            maxSteps: null          # null / omitted / 0 / "" = follow defaultMaxSteps
+- id: dsh-session-rotate
+  name: dsh-session-rotate
+  config:
+    defaultMaxSteps: 40
+    workspaces:
+      - name: my-workspace      # must match the sidebar name exactly (spaces and case included)
+        maxSteps: null          # null / omitted / 0 / "" = follow defaultMaxSteps
 ```
 
 `workspaces` defaults to an empty array — **empty means the plugin does nothing anywhere**. Add one line per workspace you want it to cover.
+
+> If you installed 1.5.0 or earlier (that version shipped an empty bundle patch), you still have to write the `- insert:` block into the profile's `cordis.patch.yml` by hand.
 
 **4. Restart the whole DSH process once.** Reopening the window does *not* reload plugins. After the restart the Web GUI port changes — take the new address from the startup log.
 
@@ -120,7 +125,7 @@ Do **not** set `maxSteps` to 2 or 3 to "test" it for real: rotations are real (n
 
 Temporarily off: set `workspaces` to `[]` (or delete the config). Applies on save.
 
-Full removal: delete the `- insert:` block from `cordis.patch.yml`; remove one line each from the profile's `package.json` (`dependencies` and `dsh.profile.bundles`); delete the `node_modules/dsh-session-rotate` link; restart DSH.
+Full removal: delete the config override block you added (if any — the mount itself comes from the package, so there is no `- insert:` line of yours to remove); remove one line each from the profile's `package.json` (`dependencies` and `dsh.profile.bundles`); delete the `node_modules/dsh-session-rotate` link; restart DSH.
 
 ```bash
 rm -rf ~/.dsh/session-rotate      # optional: logs, pause state and delta history too
@@ -151,7 +156,7 @@ Definitions, time zones (the platform CSV is `+08:00` local time, `debug.log` is
 
 ## Testing status
 
-Only tested in my own environment — **no** cross-platform or cross-version verification: DSH Desktop `0.2.1-rc.3` (Windows) + Node `v24.18.0`, `npm test` → 53 pass / 0 fail (`node --test`). CI (`.github/workflows/test.yml`) runs the unit tests on ubuntu + windows × node 20/22/24, but that covers unit tests only, not host behaviour.
+Only tested in my own environment — **no** cross-platform or cross-version verification: DSH Desktop `0.2.1-rc.3` (Windows) + Node `v24.18.0`, `npm test` → 79 pass / 0 fail (`node --test`). CI (`.github/workflows/test.yml`) runs the unit tests on ubuntu + windows × node 20/22/24, but that covers unit tests only, not host behaviour.
 
 ## Disclaimer
 

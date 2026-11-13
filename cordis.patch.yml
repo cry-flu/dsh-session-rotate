@@ -1,5 +1,24 @@
-# dsh-session-rotate —— bundle patch（刻意留空）
+# dsh-session-rotate —— bundle patch（挂载声明）
 #
-# 挂载条目写在 profile 的 cordis.patch.yml 里（那里同时放 workspaces 配置），
-# 这样配置只有一处、热重载也只走一个入口，避免 bundles 与 profile patch 各插一份。
-[]
+# 这是 package.json 里 `dsh.bundle.patch` 指向的层：`dsh plugin add` 会把本包追加进
+# profile 的 dsh.profile.bundles，启动时 boot 按顺序合并这一层，效果等同手写 mount 行。
+# 所以装完即挂载 —— 设置页里会直接出现「会话换新」，不用再手改 profile 的 cordis.patch.yml。
+#
+# 迁移提示：如果 profile 自己的 cordis.patch.yml 里手写过
+#     - insert:
+#         - id: dsh-session-rotate
+#           name: dsh-session-rotate
+# 请把那条 insert 删掉，只保留 `- id: dsh-session-rotate` + config 的覆盖形式，
+# 否则同 id 两条 insert 会在加载时报重复（同 id 手写重复一向是 loud failure）。
+#
+# 默认值刻意保守，装完不会自己在任何工作区开换新：
+#   workspaces: []  = 名单为空，任何工作区都不生效（面板里填上工作区名才开始）
+#   dryRun: true    = 即使配了名单也只写日志、不真换，先观察一轮
+# 运行时仍以 ~/.dsh/session-rotate/config.json 为准，副本只在它不存在时回落到这里。
+- insert:
+    - id: dsh-session-rotate
+      name: dsh-session-rotate
+      config:
+        defaultMaxSteps: 40
+        workspaces: []
+        dryRun: true

@@ -76,7 +76,7 @@ cmd /c mklink /J "<profile>\node_modules\dsh-session-rotate" "<插件目录绝�
 | `cooldownMinutes` | `10` | 同一工作区在该时间窗内最多换 1 次 |
 | `maxRotations` | `3` | 在 `cooldown × maxRotations` 窗口里换满即暂停该工作区（状态存 `state.json`，重启不清零） |
 | `dryRun` | `false` | 试运行开关 |
-| `archiveOnRotate` | `true` | 换新时归档旧会话；设 `false` 则旧会话会留在侧边栏，请自行定期清理（上一轮正文仍会整段贴进交接摘要） |
+| `archiveOnRotate` | `true` | 换新时归档旧会话；设 `false` 则旧会话会留在侧边栏，请自行定期清理（交接摘要只带状态，不含上一轮正文） |
 | `deferArchiveMinutes` | `0` | 换新后旧会话先留多少分钟再归档，留的这段时间它在侧边栏里可直接点开看最后一条回复（默认视图不显示已归档会话）；`0` = 换新即归档（与 1.0.0 行为一致）；保留期内旧会话又被用到，会在那一轮结束时把整段保留期重新计一遍；到点时这个会话还有活在跑就往后顺 1 分钟（最多 10 次），见「已知限制」 |
 | `autoSwitch` | `true` | 换新后是否把界面切到新会话；设 `false` 则仍然建新会话、投递交接摘要，但界面停在旧会话，新会话只出现在侧边栏。此时归档要看下一项：到点会先把你切到新会话再归档 |
 | `switchOnArchive` | `true` | 只在 `autoSwitch=false` 且 `deferArchiveMinutes>0` 时起作用：到点先把界面切到新会话，再归档旧会话，免得你正看着的会话变成「暂时无法查看」。设 `false` 则界面既不会自动跳、旧会话也永不归档 |
@@ -170,7 +170,7 @@ pwsh -File tools\usage-summary.ps1 -Path E:\download\usage_data_2026-11-07_2026-
 
 ## 测试情况
 
-只在我本人环境跑过，**没有**跨平台、跨版本验证：DSH 桌面版 `0.2.1-rc.3`（Windows）+ Node `v24.18.0`，`npm test` → 53 pass / 0 fail（`node --test`）。CI（`.github/workflows/test.yml`）会在 ubuntu + windows × node 20/22/24 上跑单测，但那只覆盖单测，不覆盖宿主行为。
+只在我本人环境跑过，**没有**跨平台、跨版本验证：DSH 桌面版 `0.2.1-rc.3`（Windows）+ Node `v24.18.0`，`npm test` → 79 pass / 0 fail（`node --test`）。CI（`.github/workflows/test.yml`）会在 ubuntu + windows × node 20/22/24 上跑单测，但那只覆盖单测，不覆盖宿主行为。
 
 ## 声明
 

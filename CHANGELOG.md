@@ -3,6 +3,25 @@
 本项目的所有重要改动都记在这里。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
+## [1.5.1] — 2026-11-13
+
+刚装上插件、或这个工作区还没有任何增量历史时，第一轮不再「装上就当场换新」。
+
+### 修复
+
+- **真首轮不再被退化判据换掉。** 新装后第一轮没有上一轮基线，`decideRotate` 的预判会退化成 `steps >= limit/2`（`decide.js:55-59` 的 `estimated` 分支），几乎必然立刻换新。现在 `turn/end` 判定时若 `verdict.estimated && verdict.shouldRotate`，本轮不换，只记一条 `跳过：首轮无基线，不换，等下一轮`（同一会话同一档步数只记一次，没有换新意图的轮次不会刷日志）。`lib/decide.js` 一行未动，闸加在 `lib/index.js` 的 `rotateIfDue` 里，位置在 paused 之后、`!verdict.shouldRotate` 之前。
+- **设置页那句过时文案。** `lib/client.js:56` 还写着「上一轮正文仍会整段贴在新会话的交接摘要里」，1.5.0 已经把照贴全文删了。中英文两处（`lib/client.js:56`、`lib/client.js:104`）与文档里的 `archiveOnRotate` 行（`README.md:84`、`docs/index.md:79`）一起改成「交接摘要只带状态，不含上一轮正文」。
+
+### 变更
+
+- 首轮被这道闸拦下时，代价是那一轮会盲跑到 `steps >= limit` 才换，第二轮起恢复正常预判；日志里写明原因，不静默。
+- 试运行（`dryRun`）下同一分支也记一条：`[dry-run] …（首轮无基线，不换：dry-run 同样不换，等下一轮有增量均值再判）`。
+- `steps < minSteps` 时归因仍给 `minSteps`（`未达最小步数`），不会被说成「首轮无基线」。
+
+### 测试
+
+- 新增 `test/firstround.test.mjs`（走真 `apply()` + 假 ctx，从 `turn/end` 进 `rotateIfDue`）：首轮退化成必换时不换、不写冷却时间戳；`steps` 远小于 `limit/2` 时**不产生**「首轮无基线」日志；`steps < minSteps` 归因给 `minSteps`；`dryRun` 同一分支也记一条。79 pass。
+
 ## [1.5.0] — 2026-11-13
 
 交接摘要改成「状态」，不再照贴上一轮回复全文。人要读细节回旧会话翻，AI 要的是「现在处于什么状态」。

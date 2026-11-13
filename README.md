@@ -47,20 +47,25 @@
 cmd /c mklink /J "<profile>\node_modules\dsh-session-rotate" "<插件目录绝对路径>"
 ```
 
-**3. profile 的 `cordis.patch.yml` 末尾挂载并配置**
+**3. 挂载：已经由包自带的 `cordis.patch.yml` 提供，不用手写。**
+
+本包声明了 `dsh.bundle.patch`，只要包名出现在 profile 的 `dsh.profile.bundles` 里（第 1 步），启动时就会被插进配置树，设置页里直接出现「会话换新」。默认值是保守的：`workspaces: []`（所有工作区都不生效）+ `dryRun: true`（只记日志不真换）。
+
+要启用，在设置页「会话换新」里填工作区名、取消「试运行」即可；也可以在本机 profile 的 `cordis.patch.yml` 里覆盖默认值（**不要再写 `insert`**，同 id 两条 insert 加载时会报重复）：
 
 ```yaml
-- insert:
-    - id: dsh-session-rotate
-      name: dsh-session-rotate
-      config:
-        defaultMaxSteps: 40
-        workspaces:
-          - name: my-workspace      # 与侧边栏显示名完全一致（空格、大小写都算）
-            maxSteps: null          # null / 省略 / 0 / 空串 = 跟随 defaultMaxSteps
+- id: dsh-session-rotate
+  name: dsh-session-rotate
+  config:
+    defaultMaxSteps: 40
+    workspaces:
+      - name: my-workspace      # 与侧边栏显示名完全一致（空格、大小写都算）
+        maxSteps: null          # null / 省略 / 0 / 空串 = 跟随 defaultMaxSteps
 ```
 
 `workspaces` 默认为空数组 —— **空 = 所有工作区都不生效**，用哪个工作区就显式加哪一行。
+
+> 装的是 1.5.0 及更早版本的包（那版 bundle patch 是空数组）时，仍需按老办法在 profile 的 `cordis.patch.yml` 里手写 `- insert:` 挂载。
 
 **4. 整个 DSH 换进程重启一次。**「重开窗口」不会重载插件；重启后 Web GUI 端口会变，看启动日志里的新地址。
 
@@ -76,7 +81,7 @@ cmd /c mklink /J "<profile>\node_modules\dsh-session-rotate" "<插件目录绝�
 | `cooldownMinutes` | `10` | 同一工作区在该时间窗内最多换 1 次 |
 | `maxRotations` | `3` | 在 `cooldown × maxRotations` 窗口里换满即暂停该工作区（状态存 `state.json`，重启不清零） |
 | `dryRun` | `false` | 试运行开关 |
-| `archiveOnRotate` | `true` | 换新时归档旧会话；设 `false` 则旧会话会留在侧边栏，请自行定期清理（上一轮正文仍会整段贴进交接摘要） |
+| `archiveOnRotate` | `true` | 换新时归档旧会话；设 `false` 则旧会话会留在侧边栏，请自行定期清理（交接摘要只带状态，不含上一轮正文） |
 | `deferArchiveMinutes` | `0` | 换新后旧会话先留多少分钟再归档，留的这段时间它在侧边栏里可直接点开看最后一条回复（默认视图不显示已归档会话）；`0` = 换新即归档（与 1.0.0 行为一致）；保留期内旧会话又被用到，会在那一轮结束时顺延整段保留期；到点时这个会话还有活在跑（正在答、子代理、后台任务、定时提醒），归档自动往后顺 1 分钟，最多顺 10 次，见「已知限制」 |
 | `autoSwitch` | `true` | 换新后是否把界面切到新会话；设 `false` 则仍然建新会话、投递交接摘要，但界面停在旧会话，新会话只出现在侧边栏。此时归档要看下一项：到点会先把你切到新会话再归档 |
 | `switchOnArchive` | `true` | 只在 `autoSwitch=false` 且 `deferArchiveMinutes>0` 时起作用：到点先把界面切到新会话，再归档旧会话，免得你正看着的会话变成「暂时无法查看」。设 `false` 则界面既不会自动跳、旧会话也永不归档 |
@@ -120,7 +125,7 @@ cmd /c mklink /J "<profile>\node_modules\dsh-session-rotate" "<插件目录绝�
 
 临时关闭：`workspaces` 改成 `[]`（或删掉配置），保存即生效。
 
-彻底卸载：删掉 `cordis.patch.yml` 里那段 `- insert:`；从 profile 的 `package.json` 的 `dependencies` 和 `dsh.profile.bundles` 各删一行；删掉 `node_modules/dsh-session-rotate` 链接；重启 DSH。
+彻底卸载：删掉你加的 config 覆盖块（如果有 —— 挂载由包自带，本来就没有你自己的 `- insert:` 行）；从 profile 的 `package.json` 的 `dependencies` 和 `dsh.profile.bundles` 各删一行；删掉 `node_modules/dsh-session-rotate` 链接；重启 DSH。
 
 ```bash
 rm -rf ~/.dsh/session-rotate      # 可选：连日志、暂停状态、增量历史一起删
@@ -130,7 +135,7 @@ rm -rf ~/.dsh/session-rotate      # 可选：连日志、暂停状态、增量�
 
 - **热重载无效。** 改插件代码（尤其 `lib/client.js`）后必须整个 DSH 换进程重启，「重开窗口」不算；重启后 Web GUI 端口会变。
 - **上限是软上限。** 判定只发生在轮与轮之间，不打断进行中的轮，真实换新点会在 `maxSteps` 附近浮动：开预判通常略低，关预判往往明显偏高（一轮能跑掉二十几步）。
-- **换新后的第一轮是一次真实请求。** 新会话把交接摘要作为第一条用户消息发出去，摘要本身零成本，但那一轮对话照常计费，会产生少量 token 费用。
+- **换新后的第一轮是一次全量冷启动，前缀缓存要从头建。** 新会话的缓存是空的，交接摘要作为第一条用户消息发出去，那一轮的输入几乎全算新内容、拿不到缓存折扣；从第二次请求起前缀才对上，回到 98% 以上。本机实测（2026-11-13，`work area`）：换新后第 1 次请求 42.9K 输入只命中 26.5K（**61.7%**，16.4K 全新），第 2、3 次分别是 98.9% / 97.9%，三次累计 86.4%。结论是**换得越勤、单会话越短，累计命中率越低** —— 想让命中率 / 平均单价好看，就把 `maxSteps` 调大让一个会话跑久一点；5–10 步一换那种配置，每次换新都要重付一次冷启动。
 - 只对顶层会话生效，子会话跳过；每个会话只触发一次；被暂停的工作区用 `POST /dsh-session-rotate/config` 带 `{"clearPause": true}` 恢复，或删 `~/.dsh/session-rotate/state.json` 后重启插件。
 - **延迟归档到点会先把界面切走。** 走「不跳转 + N 分钟后清理」这条路时，到点由 `switchOnArchive` 先把界面切到新会话，`SWITCH_LEAD_MS`（3 秒，`lib/index.js:179`）之后才归档旧会话。如果那一刻你正在旧会话里打字，界面切走会把输入框一起带走 —— 没发出去的内容不会跟着过来。
 - **保留期到点撞上正在跑的活：顺延，不掐断；顺延用尽就永久放弃。** 到点先问宿主这个会话还有没有活在跑（`workspace/session-activity` 瀑布，`archiveDeferredOnce`），有就顺延 1 分钟再问，最多 10 次（`MAX_DEFERRALS`）。顺延用尽还有活就**放弃归档**：这条待办当场删掉（`forgetDeferred`，`lib/index.js:1359`）、**此后不会再试**，旧会话保持未归档状态一直留在侧边栏，需要你自己手动归档；日志那一行是「旧会话一直有活，放弃到点归档、会话原样留着：<会话 id>（已顺延 10 次，…）」。（归档调用抛 `WorkspaceActiveSessionError` 之外的错误时同样删待办、不重试，日志记「旧会话到点归档失败（会话仍是未归档状态）」，`lib/index.js:1487`。）归档调用 `archiveSession(id)` **不带** `stopActivity`，宿主在这几毫秒里又判活跃会抛 `WorkspaceActiveSessionError`，插件接住继续顺延 —— 任何情况下都不会掐断正在跑的那一轮。所以「最多顺 10 次」只约束顺延那一段（约 10 分钟，`RETRY_MS` × `MAX_DEFERRALS`），**不是**「10 分钟后一定归档」：放弃之后它就一直留着，想清掉只能自己手动归档。保留期内继续在旧会话里发消息，仍照旧在那一轮结束时把整段保留期重新计一遍。
@@ -151,7 +156,7 @@ rm -rf ~/.dsh/session-rotate      # 可选：连日志、暂停状态、增量�
 
 ## 测试情况
 
-只在我本人环境跑过，**没有**跨平台、跨版本验证：DSH 桌面版 `0.2.1-rc.3`（Windows）+ Node `v24.18.0`，`npm test` → 53 pass / 0 fail（`node --test`）。CI（`.github/workflows/test.yml`）会在 ubuntu + windows × node 20/22/24 上跑单测，但那只覆盖单测，不覆盖宿主行为。
+只在我本人环境跑过，**没有**跨平台、跨版本验证：DSH 桌面版 `0.2.1-rc.3`（Windows）+ Node `v24.18.0`，`npm test` → 79 pass / 0 fail（`node --test`）。CI（`.github/workflows/test.yml`）会在 ubuntu + windows × node 20/22/24 上跑单测，但那只覆盖单测，不覆盖宿主行为。
 
 ## 声明
 
