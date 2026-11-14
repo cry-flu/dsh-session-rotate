@@ -5,7 +5,8 @@
 
 ## 0. 现状一句话
 
-插件已发布到 `https://github.com/cry-flu/dsh-session-rotate`，当前正式版 `v1.5.0`（2026-11-13）。本机 `main` 与 `origin/main` 齐平。
+插件已发布到 `https://github.com/cry-flu/dsh-session-rotate`，当前正式版 `v1.5.1`（2026-11-13 15:35 发布，commit `f07fd3c`）。
+本地工作树待发一版 `1.6.0`（**未提交**，次版本）：会话名（`SESSION_TITLE:` 末行自述）+ 标题堆叠幂等修复 + `handoffMode` 交接形式三档（`summary` / `tail` / `id`）+ bundle 挂载并入。维护者已定「并入 1.6.0，先不忙发」。
 
 ## 1. 发版与版本号（硬规矩）
 
@@ -85,7 +86,7 @@ npm 上已有同名包（或版本号被占用）时，**不要自己改名发�
 
 - 文档（上一轮已做）：实测参考整节搬到 `docs/usage-data.md`（README 只留表+一句话+链接）；「11-07 跑的还是 1.1.x」→「当天版本还是 0.2.1–1.0.0」；常用组合末行 `switchOnArchive` 标「任意」并补两种等价实现；`README.en.md` 同步。
 - 数据订正：平台 CSV 是 `+08:00` 本地时、`debug.log` 是 UTC；「11-03 当天下午已有换新」不成立（首条加载 = 本地 11-04 00:03，本地 11-03 零次换新）；换新 46 次按本地日 = 11-04 4 / 11-07 26 / 11-08 16；11-03 那行可由整日导出复算（与表七列逐位一致），`docs/usage-data.md` 已把这行显式标成「可复算」并写明口径与复算命令。
-- **代码已改（1.4.2）**：到点归档不再传 `stopActivity`。`archiveDeferredOnce`（`lib/index.js:1033`）先探 `workspace/session-activity`（宿主判据在 `dsh-workspace/lib/index.js:531-532`，四族 provider：turn/job/subagent/schedule）→ 有活顺延 `RETRY_MS` 60 秒（`lib/index.js:163`）→ 最多 `MAX_DEFERRALS` 10 次（`lib/index.js:166`）→ 用尽放弃归档、条目删除、会话原样留着；归档调用 `archiveSession(fromId)`（`lib/index.js:1099`），宿主抛 `WorkspaceActiveSessionError` 就接住继续顺延。`retries` 随 `state.json` 持久化；`turn/end`（`lib/index.js:826`）对「被挡过的轮」在结束 3 秒后 `nudgeDeferred`（`lib/index.js:1006`）补做；`deferredBusy`（`lib/index.js:876`）防定时器与补做撞车。换新即时归档仍带 `stopActivity: true`（`lib/index.js:1306`，那时这一轮已经结束）。
+- **代码已改（1.4.2）**：到点归档不再传 `stopActivity`。`archiveDeferredOnce`（`lib/index.js:1612`）先探 `workspace/session-activity`（宿主判据在 `dsh-workspace/lib/index.js:531-532`，四族 provider：turn/job/subagent/schedule）→ 有活顺延 `RETRY_MS` 60 秒（`lib/index.js:216`）→ 最多 `MAX_DEFERRALS` 10 次（`lib/index.js:219`）→ 用尽放弃归档、条目删除、会话原样留着；归档调用 `archiveSession(fromId)`（`lib/index.js:1686`），宿主抛 `WorkspaceActiveSessionError` 就接住继续顺延。`retries` 随 `state.json` 持久化；`turn/end`（`lib/index.js:1404`）对「被挡过的轮」在结束 3 秒后 `nudgeDeferred`（`lib/index.js:1593`）补做；`deferredBusy`（`lib/index.js:1459`）防定时器与补做撞车。换新即时归档仍带 `stopActivity: true`（`lib/index.js:1963`，那时这一轮已经结束）。
 - 测试：新增 `test/deferred.test.mjs`（3 条纯函数 + 4 条集成，集成用临时 `DSH_HOME` + 假 ctx 跑真 `apply()`），`npm test` 53 pass / 0 fail。
 - **发版留痕（2026-11-08）**：main `39e3323`，tag `v1.4.2`（annotated object `e8dc10a` → commit `39e3323`），Release id `438099587`，<https://github.com/cry-flu/dsh-session-rotate/releases/tag/v1.4.2>。附件 `dsh-session-rotate-1.4.2.tgz` 47307 B，`sha256:6b5a2e04935adb8bf84f741abdd396cbfefdc9a6f83656d71af2c6f600cfe39c`（GitHub 侧 digest 与本地一致）。CI 9 项 check 全 success（test × 6 平台组合 + build + deploy）。
 - 同日 `v1.4.1`（12:23）之后 3 小时再发 1.4.2，属维护者当场批准的 1.4 例外（原话：「破例，今天就发 1.4.2」）。

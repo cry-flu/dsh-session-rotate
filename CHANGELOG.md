@@ -3,17 +3,32 @@
 本项目的所有重要改动都记在这里。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [SemVer](https://semver.org/lang/zh-CN/)。
 
-## [1.5.1] — 2026-11-13
+## [1.6.0] — 2026-11-14
 
-刚装上插件、或这个工作区还没有任何增量历史时，第一轮不再「装上就当场换新」。
+换新出来的新会话，标题上写的是它自己在干什么；标题也不会再一层层叠上去；交接内容可以只给「旧会话 id + 落盘的尾条」，不再固定塞一份摘要。
+
+> 本条目包含原计划单独发布的 1.5.1 的全部改动（真首轮不再被退化判据换掉、包内 `cordis.patch.yml` 自带挂载、设置页过时文案）。1.5.1 从未单独打过 tag，改动合并到本版一起发出。
+
+### 新增
+
+- **会话名。** 到上限那一轮的预算提醒里，多要模型一行：回复最后单独一行写 `SESSION_TITLE: <这段工作在干什么>`。换新时从旧会话最后一条助手消息里抽最后一个标记当新会话标题；抽不到就退到「当前目标」首句，再退到末个改动文件名，最后才用旧标题兜底。名字截到 20 字（侧栏看得下的一行），去掉引号、尾标点，不带版本号和时间。全程只读已有事件，**不额外发一次总结请求** —— 换新本来就是为了省钱。
+- **`handoffMode`：交接形式三档。** `summary`（默认，跟 1.5.x 一样 12 行状态）/ `tail` / `id`。`tail` 档换新时把旧会话最后 8 段（用户 / 助手 / 工具调用）渲染成纯文本，落到 `~/.dsh/session-rotate/handoff/<oldId>.txt`（最多留 20 份，按修改时间淘汰），交接消息只剩 6 行：标记 + 旧会话 id/工作区/步数 + 尾条路径 + 「别去解 `.zstd`」+ 当前目标 + 未完成。`id` 档只发会话 id，调试用。
+  - 为什么不让新会话自己去读会话文件：`session.v4.jsonl.zstd` 是几百个 zstd 帧首尾拼接，整份交给 `zstdDecompressSync` 只吐出第一帧（那行 `{"type":"session",…}`），不报错也不继续——每个新会话都得现写切片解压脚本，还容易把「只拿到第一行」当成读到了。尾条由插件用 `session.ownEvents()` 现渲染，零解压。
+  - 落盘失败（磁盘满、权限）时本次自动退回 `summary`，并在日志里写一句，不会给新会话留一个空指针。
+  - 「当前目标」和「未完成」两行在 `tail` 档仍然保留：新会话默认不会去 read 文件，没这两行就是盲开。
 
 ### 修复
 
-- **真首轮不再被退化判据换掉。** 新装后第一轮没有上一轮基线，`decideRotate` 的预判会退化成 `steps >= limit/2`（`decide.js:55-59` 的 `estimated` 分支），几乎必然立刻换新。现在 `turn/end` 判定时若 `verdict.estimated && verdict.shouldRotate`，本轮不换，只记一条 `跳过：首轮无基线，不换，等下一轮`（同一会话同一档步数只记一次，没有换新意图的轮次不会刷日志）。`lib/decide.js` 一行未动，闸加在 `lib/index.js` 的 `rotateIfDue` 里，位置在 paused 之后、`!verdict.shouldRotate` 之前。
+- **会话名抽成垃圾词。** 现象是侧栏出现 `[#2] 收尾 · 好 @ 10:54`、`[#1] 接续 · 1 @ 10:06`、`[#2] 收尾 · 确认 @ 02:10` 这种标题。原因：`deriveSessionName` 的第二级兜底取的是**最后一条用户消息**首句，用户只回一句「好」/「1」/「确认」时就被原样当名字，整条链路没有任何质量门槛（模型自己写 `SESSION_TITLE: 好` 也一样收）。现在新增 `junkName`：长度 < 3、纯数字/纯符号、应答词白名单（好/嗯/可以/确认/继续/收到/谢谢/ok…）一律判为「没抽到」，`deriveSessionName` 的三个候选逐级过闸；用户消息那级从「最后一条」改成「第一条说得上事的」，全退完才返回空串交给现标题兜底。
+- **会话标题层层堆叠。** 现象是侧栏出现 `[#1] 接续 · 接续 · 接续 · 接续 · …`，还有 `@ 02:38 @ 13:59` 两个时间戳、`… effects @ 02` 这种被截一半的戳。三处原因：`numberedTitle` 只剥 `[#N] ` 前缀，不剥 `接续 ·` / `收尾 ·` / 末尾 ` @ HH:MM`；换新时 `base` 取的是**上一次改过的标题**，于是每次换新再叠一层；先拼装饰再 `slice(0,60)`，截断切在时间戳中间。现在标题先经 `parseTitle` 拆成 `{index, tag, stamp, base}`（循环剥离，叠了几层都一次收敛成一层，只留最新的标签和时间），`numberedTitle` 先截 `base`（40 字）再拼装饰；`opts` 没给 `tag`/`stamp` 时沿用标题里原有的，所以每轮 `ensureNumbering` 只改序号、不会把换新时写下的标注抹掉。
+- **真首轮不再被退化判据换掉。** 刚装上插件、或这个工作区还没有任何增量历史时，第一轮没有上一轮基线，`decideRotate` 的预判会退化成 `steps >= limit/2`（`lib/decide.js:55-59` 的 `estimated` 分支），几乎必然立刻换新。现在 `turn/end` 判定时若 `verdict.estimated && verdict.shouldRotate`，本轮不换，只记一条 `跳过：首轮无基线，不换，等下一轮`（同一会话同一档步数只记一次，没有换新意图的轮次不会刷日志）。`lib/decide.js` 一行未动，闸加在 `lib/index.js` 的 `rotateIfDue` 里，位置在 paused 之后、`!verdict.shouldRotate` 之前。
 - **设置页那句过时文案。** `lib/client.js:56` 还写着「上一轮正文仍会整段贴在新会话的交接摘要里」，1.5.0 已经把照贴全文删了。中英文两处（`lib/client.js:56`、`lib/client.js:104`）与文档里的 `archiveOnRotate` 行（`README.md:84`、`docs/index.md:79`）一起改成「交接摘要只带状态，不含上一轮正文」。
 
 ### 变更
 
+- 本版新增一个配置键 `handoffMode`（默认 `summary`，行为与 1.5.x 一致），不改任何已有默认值或挂载方式（包内 `cordis.patch.yml` 自带挂载从本版起生效，见本节末几条）。
+- 设置页「会话换新」多一个「交接形式」下拉（摘要 / 尾条 / 仅 id），保存即生效；这一行属于 `lib/client.js`，改完要整个应用换 PID 重启才加载。
+- README / docs 补上「多任务处理时的交接还有缺陷，仍在完善，有时会硬把你换走」的说明，以及 1.5.0 起的轮前预算提醒（之前文档漏写）。
 - **装完即挂载。** 包内 `cordis.patch.yml` 从空数组改成真正的 `- insert:` 块（这就是 `package.json` 里 `dsh.bundle.patch` 指向的那一层），默认 `defaultMaxSteps: 40` / `workspaces: []` / `dryRun: true` —— 名单为空 + 空跑，装完不会自己在任何工作区开换新。`dsh plugin add` 后设置页直接出现「会话换新」，不用再手改 profile 的 `cordis.patch.yml`。老 profile 里手写过的同 id `insert` 要改成纯 `- id: …` + `config:` 的覆盖形式，否则同 id 两条 insert 加载时报重复。README 中英与卸载说明同步（1.5.0 及更早的包仍是空 bundle patch，老办法照旧）。
 - 首轮被这道闸拦下时，代价是那一轮会盲跑到 `steps >= limit` 才换，第二轮起恢复正常预判；日志里写明原因，不静默。
 - 试运行（`dryRun`）下同一分支也记一条：`[dry-run] …（首轮无基线，不换：dry-run 同样不换，等下一轮有增量均值再判）`。
@@ -21,7 +36,10 @@
 
 ### 测试
 
-- 新增 `test/firstround.test.mjs`（走真 `apply()` + 假 ctx，从 `turn/end` 进 `rotateIfDue`）：首轮退化成必换时不换、不写冷却时间戳；`steps` 远小于 `limit/2` 时**不产生**「首轮无基线」日志；`steps < minSteps` 归因给 `minSteps`；`dryRun` 同一分支也记一条。79 pass。
+- 新增 `test/title.test.mjs`（21 例）：五层堆叠清成一层、`收尾`→`接续` 只留最新标签、连算三次幂等、真标题里的 ` · ` 不误删、`@ 02` 半截戳留在 base、先截 base 再拼装饰、坏输入不崩；`extractSessionName` 取最后一个标记（含全角冒号）、超长截断；`deriveSessionName` 的三级兜底与空串；`junkName` 拦应答词 / 纯数字 / 纯符号，抽到垃圾名时逐级退到用户消息与文件名。
+- 新增 `test/handoff.test.mjs`（9 例）：`handoffModeOf` 非法值回落、`summary` 档缺省不变、`tail` 档 6 行且不含三行状态、落盘失败文案、`id` 档只给 id、尾条只留最后 8 段并带三种标签、上一轮交接摘要不套娃、空文本跳过、超长截断与空输入。
+- 新增 `test/firstround.test.mjs`（走真 `apply()` + 假 ctx，从 `turn/end` 进 `rotateIfDue`）：首轮退化成必换时不换、不写冷却时间戳；`steps` 远小于 `limit/2` 时**不产生**「首轮无基线」日志；`steps < minSteps` 归因给 `minSteps`；`dryRun` 同一分支也记一条。
+- `npm test` → 108 pass / 0 fail。
 
 ## [1.5.0] — 2026-11-13
 
@@ -56,10 +74,10 @@
 
 ### 修复
 
-- **到点归档不再传 `stopActivity`。** 先问宿主这个会话还有没有活（`workspace/session-activity` 瀑布，`archiveDeferredOnce`，`lib/index.js:1033`），有活就顺延 60 秒重查（`RETRY_MS`，`lib/index.js:163`），最多 10 次（`MAX_DEFERRALS`，`lib/index.js:166`）；顺延用尽就放弃归档、会话留在侧边栏，日志记一行「旧会话一直有活，放弃到点归档」。
-- 归档调用改成 `archiveSession(fromId)` 不带第二参（`lib/index.js:1099`）：宿主在这几毫秒里又判活跃会抛 `WorkspaceActiveSessionError`，插件接住继续顺延，整条路径没有强杀。换新即归档那条（`archiveOnRotate`）仍然是 `stopActivity: true`（`lib/index.js:1306`），那时这一轮已经结束了。
-- 待办条目新增 `retries` 并随 `state.json` 持久化；只有归档成功或放弃才删条目，顺延途中不丢。被挡过的那一轮结束后 3 秒补做一次（`turn/end`，`lib/index.js:826` → `nudgeDeferred`，`lib/index.js:1006`），没被挡过的照旧顺延整段保留期（`refreshDeferred`，`lib/index.js:972`）。
-- 定时器与 `turn/end` 补做可能同时到，加 `deferredBusy` 占位，同一条待办不会归档两次（`lib/index.js:876`）。
+- **到点归档不再传 `stopActivity`。** 先问宿主这个会话还有没有活（`workspace/session-activity` 瀑布，`archiveDeferredOnce`，`lib/index.js:1612`），有活就顺延 60 秒重查（`RETRY_MS`，`lib/index.js:216`），最多 10 次（`MAX_DEFERRALS`，`lib/index.js:219`）；顺延用尽就放弃归档、会话留在侧边栏，日志记一行「旧会话一直有活，放弃到点归档」。
+- 归档调用改成 `archiveSession(fromId)` 不带第二参（`lib/index.js:1686`）：宿主在这几毫秒里又判活跃会抛 `WorkspaceActiveSessionError`，插件接住继续顺延，整条路径没有强杀。换新即归档那条（`archiveOnRotate`）仍然是 `stopActivity: true`（`lib/index.js:1963`），那时这一轮已经结束了。
+- 待办条目新增 `retries` 并随 `state.json` 持久化；只有归档成功或放弃才删条目，顺延途中不丢。被挡过的那一轮结束后 3 秒补做一次（`turn/end`，`lib/index.js:1404` → `nudgeDeferred`，`lib/index.js:1593`），没被挡过的照旧顺延整段保留期（`refreshDeferred`，`lib/index.js:1559`）。
+- 定时器与 `turn/end` 补做可能同时到，加 `deferredBusy` 占位，同一条待办不会归档两次（`lib/index.js:1459`）。
 
 ### 测试
 
@@ -67,7 +85,7 @@
 
 ### 文档
 
-- README / `README.en.md` / `docs/index.md` 的延迟归档说明与「已知限制」改成顺延语义（原文还写着「那一轮会被中途归档」「不要在旧会话里发消息」）；并写明顺延用尽之后的结果：**放弃归档**，待办条目当场删掉（`forgetDeferred`，`lib/index.js:1065`）、此后不会再试，旧会话保持未归档状态一直留在侧边栏、需要自己手动归档 —— 「最多顺 10 次」只约束顺延那一段（约 10 分钟，`RETRY_MS` × `MAX_DEFERRALS`），不是「10 分钟后一定归档」。原文只写「会话可能一直留着（最长约 10 分钟）」，读者容易读成到点必归档。
+- README / `README.en.md` / `docs/index.md` 的延迟归档说明与「已知限制」改成顺延语义（原文还写着「那一轮会被中途归档」「不要在旧会话里发消息」）；并写明顺延用尽之后的结果：**放弃归档**，待办条目当场删掉（`forgetDeferred`，`lib/index.js:1573`）、此后不会再试，旧会话保持未归档状态一直留在侧边栏、需要自己手动归档 —— 「最多顺 10 次」只约束顺延那一段（约 10 分钟，`RETRY_MS` × `MAX_DEFERRALS`），不是「10 分钟后一定归档」。原文只写「会话可能一直留着（最长约 10 分钟）」，读者容易读成到点必归档。
 - `docs/usage-data.md` 三行显式标成「可复算」，写明口径与复算命令（`tools/usage-summary.ps1 -Path <zip>`）。
 - `PROMO.md` 里的本机路径换成 `<仓库目录>` / `<ffmpeg.exe 路径>` / `<一个干净的临时 HOME>` 占位。
 
@@ -81,7 +99,7 @@
 
 ### 文档
 
-- README / `README.en.md` 新增一条使用提醒：延迟归档的保留期内不要在旧会话里继续发消息。顺延只在轮与轮之间重算（`lib/index.js:802` 的 `turn/end` → `refreshDeferred`，`lib/index.js:937`），长过剩余保留期的那一轮会被 `stopActivity: true` 的归档（`lib/index.js:988`）中途掐掉并归档，任务做一半就断。`deferArchiveMinutes` 字段说明同步改口。
+- README / `README.en.md` 新增一条使用提醒：延迟归档的保留期内不要在旧会话里继续发消息。顺延只在轮与轮之间重算（`lib/index.js:1404` 的 `turn/end` → `refreshDeferred`，`lib/index.js:1559`），长过剩余保留期的那一轮会被 `stopActivity: true` 的归档（`lib/index.js:1686`）中途掐掉并归档，任务做一半就断。`deferArchiveMinutes` 字段说明同步改口。
 - 演示 GIF 重录为 6 镜头。
 
 ## [1.4.0] — 2026-11-08
